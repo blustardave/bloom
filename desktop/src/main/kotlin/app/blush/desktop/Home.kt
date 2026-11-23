@@ -514,7 +514,8 @@ fun HomeRoute(session: Session) {
 @Composable
 fun PosterColumns(items: List<BaseItemDto>, columns: Int, pictures: Pictures, gap: Dp = 18.dp, onOpen: (BaseItemDto) -> Unit) {
     BoxWithConstraints(Modifier.fillMaxWidth()) {
-        val w = (maxWidth - gap * (columns - 1)) / columns
+        // A hair under the exact share, so rounding to whole pixels can never push the last poster onto the next line.
+        val w = (maxWidth - gap * (columns - 1)) / columns - 1.dp
         androidx.compose.foundation.layout.FlowRow(
             horizontalArrangement = Arrangement.spacedBy(gap),
             verticalArrangement = Arrangement.spacedBy(22.dp),
