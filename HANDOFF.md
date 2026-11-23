@@ -125,6 +125,22 @@ Shared with the Mac app: `shared/src/commonMain/kotlin/app/blush/tv/` (same pack
 
 ## Change history (newest first)
 
+### Build 250 → Mac 0.3.167 (Mac: Java 25 + warm-start cache, snappier scrolling, self-update; TV unchanged)
+- Owner on Mac Home: some lag while tiles load; scrolling (especially sideways) not very responsive; tired of Privacy &
+  Security → Open Anyway after every reinstall.
+- Bundled runtime is now Temurin **25** (cache key temurin-25…). Launcher: first launch of each version runs with
+  `-XX:AOTCacheOutput=~/Library/Caches/app.blush.mac/bloom-<ver>.aot` (JEP 514/515: classes + method profiles, written when
+  Bloom quits); later launches use `-XX:AOTCache=` it, so Java starts warm. Old .aot/.jsa files are deleted. The training
+  run's quit takes a few seconds longer (it builds the cache).
+- Scrolling: `-Dskiko.rendering.macos.waitForPreviousFrameVsyncOnRedrawImmediately=false` (reported fix for laggy
+  scrolling/resizing on macOS) and `-Dcompose.scrolling.smooth.enabled=false` (no animated smoothing on top of the
+  trackpad's own; mouse wheels step like native Mac apps). Not verified on a Mac yet.
+- `Updater.kt`: Help → Check for Updates… reads "Mac app: x.y.z" from the latest release's notes (GitHub REST API), downloads
+  Bloom-mac.zip with Java's HttpClient (no quarantine flag, so no Gatekeeper prompt), unpacks with `ditto` next to the
+  running app, and a detached script swaps Bloom.app once this copy has quit, then opens it. The launcher passes
+  `-Dbloom.app` (the bundle path). A launch-time check (after 4 s) shows a toast when a newer version exists.
+- One-time: this version must still be installed by hand (or with the Terminal command given to the owner).
+
 ### Build 248 → app 0.3.165 (phase 3 starts: Mac Home in the TV's layout; TV unchanged apart from two moved files)
 - Owner wants the Mac to look close to the TV app. Phase 3 brings the TV's screens over one at a time, Home first.
 - Shared: `ui/components/Icons.kt` (pure Compose vectors) and `ui/CategorySpec.kt` moved to shared commonMain (same packages).

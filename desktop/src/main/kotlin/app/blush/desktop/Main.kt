@@ -56,6 +56,12 @@ fun main() {
     application {
         val scope = rememberCoroutineScope()
         val session = remember { Session(scope).also { it.start() } }
+        // A quiet check at launch: say so when a newer Mac app is on the release page.
+        androidx.compose.runtime.LaunchedEffect(Unit) {
+            kotlinx.coroutines.delay(4_000)
+            val latest = runCatching { Updater.latestVersion() }.getOrNull()
+            if (latest != null && Updater.isNewer(latest, bloomVersion)) session.toast("Bloom $latest is ready: Help → Check for Updates")
+        }
         val state = rememberWindowState(size = DpSize(1180.dp, 780.dp), position = WindowPosition(Alignment.Center))
         Window(
             onCloseRequest = ::exitApplication,
@@ -93,6 +99,22 @@ fun main() {
                     }
                     Item("Libraries", shortcut = KeyShortcut(Key.L, meta = true, shift = true), enabled = session.repo.currentUser != null) {
                         session.reset(Screen.Libraries)
+                    }
+                }
+                Menu("Help") {
+                    Item("Check for Updates…") {
+                        session.toast("Checking for updates…")
+                        session.launch {
+                            when (val r = Updater.update { session.toast(it) }) {
+                                Updater.Result.UpToDate -> session.toast("Bloom $bloomVersion is the newest version.")
+                                is Updater.Result.Failed -> session.toast(r.why)
+                                is Updater.Result.Installing -> {
+                                    session.toast("Restarting into Bloom ${r.version}…")
+                                    kotlinx.coroutines.delay(800)
+                                    exitApplication()
+                                }
+                            }
+                        }
                     }
                 }
                 Menu("View") {

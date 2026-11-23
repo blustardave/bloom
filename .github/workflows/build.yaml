@@ -113,7 +113,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/bloom-jre
-          key: temurin-21-jre-mac-aarch64-${{ steps.month.outputs.m }}
+          key: temurin-25-jre-mac-aarch64-${{ steps.month.outputs.m }}
       # Built here on Linux (no Mac runner), as Bloom.app for Apple Silicon, and published next to the APK.
       - name: Build the Mac app (Bloom.app)
         if: env.BUILD_MAC == 'true'

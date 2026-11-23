@@ -11,11 +11,12 @@ APP="$WORK/Bloom.app"
 
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$APP/Contents/app"
 
-# Java 21 runtime for macOS on Apple Silicon (Eclipse Temurin, signed and notarised by Eclipse). Cached between CI runs.
-JRE_TGZ="${JRE_CACHE:-$WORK}/temurin-21-jre-mac-aarch64.tar.gz"
+# Java 25 runtime for macOS on Apple Silicon (Eclipse Temurin, signed and notarised by Eclipse). Cached between CI runs.
+# 25 rather than 21 for its ahead-of-time cache (see the launcher below).
+JRE_TGZ="${JRE_CACHE:-$WORK}/temurin-25-jre-mac-aarch64.tar.gz"
 if [ ! -s "$JRE_TGZ" ]; then
   mkdir -p "$(dirname "$JRE_TGZ")"
-  curl -fsSL -o "$JRE_TGZ" "https://api.adoptium.net/v3/binary/latest/21/ga/mac/aarch64/jre/hotspot/normal/eclipse"
+  curl -fsSL -o "$JRE_TGZ" "https://api.adoptium.net/v3/binary/latest/25/ga/mac/aarch64/jre/hotspot/normal/eclipse"
 fi
 mkdir -p "$WORK/jre"
 tar -xzf "$JRE_TGZ" -C "$WORK/jre"
@@ -30,9 +31,12 @@ cat > "$APP/Contents/MacOS/Bloom" <<EOF
 #!/bin/sh
 # Starts Bloom with the Java runtime inside the app.
 CONTENTS="\$(cd "\$(dirname "\$0")/.." && pwd)"
-# Java keeps a ready-made copy of the classes it loaded at the first launch here, so later launches start faster.
+# Ahead-of-time cache (Java 25): the first launch of each version records which code Bloom loads and which parts run hot,
+# and saves it when Bloom quits; every later launch starts with that, so the first minutes aren't spent warming up.
 CACHE="\$HOME/Library/Caches/app.blush.mac"
 mkdir -p "\$CACHE"
+AOT="\$CACHE/bloom-$VERSION.aot"
+if [ -s "\$AOT" ]; then AOTFLAG="-XX:AOTCache=\$AOT"; else rm -f "\$CACHE"/bloom-*.aot "\$CACHE"/bloom-*.jsa; AOTFLAG="-XX:AOTCacheOutput=\$AOT"; fi
 exec "\$CONTENTS/runtime/Contents/Home/bin/java" \\
   -Xdock:name=Bloom \\
   -Xdock:icon="\$CONTENTS/Resources/bloom.icns" \\
@@ -42,7 +46,10 @@ exec "\$CONTENTS/runtime/Contents/Home/bin/java" \\
   -Dskiko.renderApi=METAL \\
   -Dbloom.version=$VERSION \\
   -Xmx1g \\
-  -XX:+AutoCreateSharedArchive -XX:SharedArchiveFile="\$CACHE/bloom-$VERSION.jsa" \\
+  "\$AOTFLAG" \\
+  -Dbloom.app="\$(cd "\$CONTENTS/.." && pwd)" \\
+  -Dskiko.rendering.macos.waitForPreviousFrameVsyncOnRedrawImmediately=false \\
+  -Dcompose.scrolling.smooth.enabled=false \\
   -jar "\$CONTENTS/app/bloom.jar" "\$@"
 EOF
 chmod +x "$APP/Contents/MacOS/Bloom"
