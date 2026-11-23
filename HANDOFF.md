@@ -143,11 +143,10 @@ Shared with the Mac app: `shared/src/commonMain/kotlin/app/blush/tv/` (same pack
   shell launcher, `bloom.icns` drawn in `desktop/mac/bloom-mac-icon.svg`) → `Bloom-mac.zip` on the `latest` release.
   The Mac steps run after the APK is published, so a Mac failure can't hold back a TV build.
 - Bloom.app is unsigned and untested on a real Mac: first launch = System Settings → Privacy & Security → Open Anyway.
-- **NOT BUILT YET (23 Nov 2026):** the old private repo ran out of GitHub Free's monthly Actions allowance. The owner chose
-  to recreate `blustardave/bloom` as a **public** repo (Actions are free there), starting from one clean commit with personal
-  details removed (the old history is gone; this file is the record). Build numbers continue: build = run + 236, so the
-  new repo's run 1 is build 237 = app 0.3.154. Nothing in this entry has been compile-checked: build, then fix; the AGP 9
-  KMP `kotlin { android { } }` block and the desktop `Font(resource=…)` call are the likeliest spots.
+- Repo recreated as **public** on 23 Nov 2026 (the old private one ran out of GitHub Free's Actions allowance), starting
+  from one clean commit with personal details removed; this file is the record of the old history. Builds 237–238 compiled
+  first time: APK 0.3.154 (versionCode 237) and `Bloom-mac.zip` (91 MB, Bloom.app 194 MB) on the release; desktop
+  screenshots checked (fonts at the right weights, hover and clicks work). Bloom.app not yet opened on a real Mac.
 - This repo is meant to be public: never write the owner's name, addresses, IPs, server details, library titles or viewing
   habits into it.
 

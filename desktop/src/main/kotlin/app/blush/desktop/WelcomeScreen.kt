@@ -104,21 +104,23 @@ private fun FilmFrame(edge: String, background: String) {
         colour = Color(SubtitleOptions.colours[0].second),
         edge = edge,
         backgroundAlpha = SubtitleOptions.pick(SubtitleOptions.backgrounds, background, 0),
-        bottom = SubtitleOptions.pick(SubtitleOptions.positions, "Normal", 1),
+        bottom = SubtitleOptions.pick(SubtitleOptions.positions, "High", 1),
     )
     Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(14.dp))) {
         Canvas(Modifier.fillMaxSize()) {
+            // Bright sky behind the subtitle, so the edge choices (shadow, outline) visibly differ.
             drawRect(
                 Brush.verticalGradient(
                     0f to Color(0xFF1F2B45),
-                    0.48f to Color(0xFF8A5A6E),
-                    0.66f to Color(0xFFE29A63),
-                    0.70f to Color(0xFF3A2A33),
+                    0.42f to Color(0xFF8A5A6E),
+                    0.80f to Color(0xFFE8A46C),
+                    0.88f to Color(0xFFF3C58A),
+                    0.885f to Color(0xFF3A2A33),
                     1f to Color(0xFF15131A),
                 ),
             )
-            drawCircle(Color(0xFFFFD49A).copy(alpha = 0.85f), radius = size.height * 0.09f, center = Offset(size.width * 0.62f, size.height * 0.63f))
-            drawRect(Color(0xFF221B24), topLeft = Offset(0f, size.height * 0.68f))
+            drawCircle(Color(0xFFFFE2B0), radius = size.height * 0.08f, center = Offset(size.width * 0.70f, size.height * 0.86f))
+            drawRect(Color(0xFF221B24), topLeft = Offset(0f, size.height * 0.885f))
         }
         SubtitleLayer(
             listOf(SubLine(AnnotatedString("Do you like our owl?\nIt's artificial?"))),
