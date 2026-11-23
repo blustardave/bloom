@@ -32,6 +32,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.IntOffset
@@ -67,14 +68,20 @@ data class PosterCard(val name: String, val year: Int?, val imageUrl: String?, v
 // ---------- Top bar ----------
 
 @Composable
-fun TopBar(userName: String, userImage: String?, onLibraries: () -> Unit, onSwitchProfile: () -> Unit, onSignOut: () -> Unit, onChangeServer: () -> Unit) {
-    Box(Modifier.fillMaxWidth().height(56.dp)) {
+fun TopBar(current: String, userName: String, userImage: String?, onHome: () -> Unit, onLibraries: () -> Unit, onSwitchProfile: () -> Unit, onSignOut: () -> Unit, onChangeServer: () -> Unit) {
+    Box(
+        Modifier.fillMaxWidth().height(64.dp)
+            // A soft shade from the top, so the tabs stay readable over the banner's artwork.
+            .background(Brush.verticalGradient(0f to Blush.colors.background.copy(alpha = 0.75f), 1f to Color.Transparent)),
+    ) {
         LocalDragArea.current(Modifier.fillMaxSize())
         Row(Modifier.fillMaxSize().padding(start = TrafficLights, end = PageSide - 2.dp), verticalAlignment = Alignment.CenterVertically) {
             val mark = remember { resourceImage("bloom_wordmark.png") }
             Image(mark, contentDescription = "Bloom", modifier = Modifier.height(20.dp).aspectRatio(430f / 112f))
             Spacer(Modifier.width(28.dp))
-            TopTab("Libraries", selected = true, onClick = onLibraries)
+            TopTab("Home", selected = current == "Home", onClick = onHome)
+            Spacer(Modifier.width(14.dp))
+            TopTab("Libraries", selected = current == "Libraries", onClick = onLibraries)
             Spacer(Modifier.weight(1f))
             ProfileMenu(userName, userImage, onSwitchProfile, onSignOut, onChangeServer)
         }
@@ -132,15 +139,20 @@ private fun MenuRow(text: String, onClick: () -> Unit) {
     )
 }
 
-/** Everything after sign-in: the top bar over the current page. */
+/**
+ * Everything after sign-in: the top bar over the current page. [underBar] pages (Home) run up behind the bar; the
+ * rest start below it.
+ */
 @Composable
-fun Shell(session: Session, content: @Composable () -> Unit) {
+fun Shell(session: Session, current: String, underBar: Boolean = false, content: @Composable () -> Unit) {
     val user = session.repo.currentUser
     Box(Modifier.fillMaxSize().background(Blush.colors.background)) {
-        Box(Modifier.fillMaxSize().padding(top = 56.dp)) { content() }
+        Box(Modifier.fillMaxSize().padding(top = if (underBar) 0.dp else 56.dp)) { content() }
         TopBar(
+            current = current,
             userName = user?.name ?: "",
             userImage = user?.let { session.repo.userImageUrl(it.userId, it.imageTag) },
+            onHome = { session.reset(Screen.Home) },
             onLibraries = { session.reset(Screen.Libraries) },
             onSwitchProfile = session::switchProfile,
             onSignOut = session::signOut,
@@ -215,7 +227,7 @@ fun LibrariesRoute(session: Session) {
 // ---------- One library ----------
 
 @Composable
-fun LibraryScreen(title: String, total: Int?, posters: List<PosterCard>, error: String?, onBack: () -> Unit, onNearEnd: () -> Unit) {
+fun LibraryScreen(title: String, total: Int?, posters: List<PosterCard>, error: String?, onBack: () -> Unit, onNearEnd: () -> Unit, onOpen: () -> Unit = {}) {
     val grid = rememberLazyGridState()
     LaunchedEffect(grid, posters.size) {
         snapshotFlow { grid.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0 }.collect { last ->
@@ -242,16 +254,15 @@ fun LibraryScreen(title: String, total: Int?, posters: List<PosterCard>, error: 
             verticalArrangement = Arrangement.spacedBy(20.dp),
             contentPadding = PaddingValues(top = 4.dp, bottom = 40.dp),
         ) {
-            itemsIndexed(posters) { _, p -> Poster(p) }
+            itemsIndexed(posters) { _, p -> Poster(p, onOpen) }
         }
     }
 }
 
 @Composable
-private fun Poster(p: PosterCard) {
+private fun Poster(p: PosterCard, onOpen: () -> Unit) {
     Column {
-        // Opening a title comes with the details page (next phase), so posters don't act on clicks yet.
-        HoverTile(null, Modifier.fillMaxWidth().aspectRatio(2f / 3f), corner = 8.dp, background = p.tint ?: tintFor(p.name).copy(alpha = 0.5f)) {
+        HoverTile(onOpen, Modifier.fillMaxWidth().aspectRatio(2f / 3f), corner = 8.dp, background = p.tint ?: tintFor(p.name).copy(alpha = 0.5f)) {
             if (p.imageUrl != null) AsyncImage(p.imageUrl, contentDescription = p.name, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
             else Text(p.name, Modifier.align(Alignment.Center).padding(10.dp), style = DesktopType.label, color = Blush.colors.textSoft)
         }
@@ -281,5 +292,5 @@ fun LibraryRoute(session: Session, library: BaseItemDto) {
     }
     LaunchedEffect(library.id) { more() }
     val posters = remember(items) { items.map { PosterCard(it.name ?: "", it.productionYear, repo.posterUrl(it), it.posterTint()) } }
-    LibraryScreen(library.name ?: "Library", total, posters, error, onBack = session::back, onNearEnd = ::more)
+    LibraryScreen(library.name ?: "Library", total, posters, error, onBack = session::back, onNearEnd = ::more, onOpen = { session.toast(ComingSoon) })
 }

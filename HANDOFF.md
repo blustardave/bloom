@@ -125,6 +125,20 @@ Shared with the Mac app: `shared/src/commonMain/kotlin/app/blush/tv/` (same pack
 
 ## Change history (newest first)
 
+### Build 248 → app 0.3.165 (phase 3 starts: Mac Home in the TV's layout; TV unchanged apart from two moved files)
+- Owner wants the Mac to look close to the TV app. Phase 3 brings the TV's screens over one at a time, Home first.
+- Shared: `ui/components/Icons.kt` (pure Compose vectors) and `ui/CategorySpec.kt` moved to shared commonMain (same packages).
+- Mac `Home.kt`: `HomeState` (featured + rows, loaded top-down, 6 at a time, 15 s give-up) with the TV's row recipe copied
+  from `HomeModel.load()` (same titles, order, daily dice, Settings hidden rows / custom order / row size / genre count),
+  minus Starring / Directed by (need the credits index), the numbered list and chips. TODO: share one recipe with the TV.
+  Banner as on the TV (backdrop crossfade, the two gradients, logo or name, details line, 2-line description, Play pill /
+  More info / watchlist +/✓ which works, dots that fill over 9 s and are clickable; pauses while the pointer is over it).
+  Rows: posters 150 dp, Continue watching 16:9 cards 252 dp with progress, hover ring + grow, ‹ › arrows while the pointer
+  is over a row (trackpad swipe / Shift+wheel also scroll). Top bar: Home and Libraries tabs over a soft shade; Home runs
+  under the bar. Go menu: Home ⇧⌘H.
+- Title pages and playback aren't on the Mac yet: Play / More info / tiles show a short message (`Session.toast`).
+- Screenshot `desktop-home.png` (invented titles).
+
 ### Build 247 → app 0.3.164 (CI builds only what changed; Mac: ⌘W, library names; TV unchanged)
 - Owner: Mac sign-in and libraries work on the real server; window drags fine by the top edge. Asked whether every change
   rebuilds the APK.

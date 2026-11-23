@@ -34,8 +34,6 @@ sealed interface Route {
     data class Player(val item: BaseItemDto, val fromStart: Boolean = false) : Route
 }
 
-/** A browsable category: its title and how to fetch a page of it (start, count) → (items, total). */
-class CategorySpec(val title: String, val load: suspend (Int, Int) -> Pair<List<BaseItemDto>, Int>)
 
 /** App-wide state: the screen stack, the signed-in user and the chosen accent. */
 class AppState(val repo: Repo) {

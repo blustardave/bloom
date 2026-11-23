@@ -88,6 +88,9 @@ fun main() {
                 }
                 Menu("Go") {
                     Item("Back", shortcut = KeyShortcut(Key.LeftBracket, meta = true), enabled = session.canGoBack, onClick = session::back)
+                    Item("Home", shortcut = KeyShortcut(Key.H, meta = true, shift = true), enabled = session.repo.currentUser != null) {
+                        session.reset(Screen.Home)
+                    }
                     Item("Libraries", shortcut = KeyShortcut(Key.L, meta = true, shift = true), enabled = session.repo.currentUser != null) {
                         session.reset(Screen.Libraries)
                     }
@@ -119,6 +122,7 @@ fun main() {
                         LocalDragArea.current(Modifier.fillMaxWidth().height(28.dp))
                         Screens(session)
                     }
+                    BlushTheme { Toast(session.toastText) }
                     PerfOverlay()
                 }
             }
@@ -133,7 +137,8 @@ private fun Screens(session: Session) {
         Screen.Server -> ServerRoute(session)
         Screen.Profiles -> ProfilesRoute(session)
         is Screen.Password -> key(s) { PasswordRoute(session, s.profile) }
-        Screen.Libraries -> Shell(session) { LibrariesRoute(session) }
-        is Screen.Library -> Shell(session) { key(s.library.id) { LibraryRoute(session, s.library) } }
+        Screen.Home -> Shell(session, "Home", underBar = true) { HomeRoute(session) }
+        Screen.Libraries -> Shell(session, "Libraries") { LibrariesRoute(session) }
+        is Screen.Library -> Shell(session, "Libraries") { key(s.library.id) { LibraryRoute(session, s.library) } }
     }
 }

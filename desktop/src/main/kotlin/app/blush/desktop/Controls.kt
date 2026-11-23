@@ -218,3 +218,20 @@ fun Note(text: String?, modifier: Modifier = Modifier, error: Boolean = false) {
         textAlign = TextAlign.Center,
     )
 }
+
+/** A short message near the bottom of the window, fading in and out. */
+@Composable
+fun BoxScope.Toast(text: String?) {
+    androidx.compose.animation.AnimatedVisibility(
+        visible = text != null,
+        modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 28.dp),
+        enter = androidx.compose.animation.fadeIn(tween(150)),
+        exit = androidx.compose.animation.fadeOut(tween(250)),
+    ) {
+        var last by remember { mutableStateOf("") }
+        if (text != null) last = text
+        Box(Modifier.clip(RoundedCornerShape(50)).background(Color(0xF02A2A2E)).padding(horizontal = 18.dp, vertical = 10.dp)) {
+            Text(last, style = DesktopType.label, color = Color.White)
+        }
+    }
+}

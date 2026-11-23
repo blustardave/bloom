@@ -16,6 +16,9 @@ import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import app.blush.tv.data.SavedServer
+import org.jellyfin.sdk.model.api.BaseItemDto
+import org.jellyfin.sdk.model.api.BaseItemKind
+import java.util.UUID
 import app.blush.tv.ui.theme.Blush
 import app.blush.tv.ui.theme.BlushTheme
 import org.jetbrains.skia.EncodedImageFormat
@@ -79,15 +82,41 @@ private val posters = listOf(
 
 /** The top bar over a page, as after sign-in (without a session). */
 @Composable
-private fun ShellLook(content: @Composable () -> Unit) {
+private fun ShellLook(current: String = "Libraries", underBar: Boolean = false, content: @Composable () -> Unit) {
     Box(Modifier.fillMaxSize().background(Blush.colors.background)) {
-        Box(Modifier.fillMaxSize().padding(top = 56.dp)) { content() }
-        TopBar("Alex", null, {}, {}, {}, {})
+        Box(Modifier.fillMaxSize().padding(top = if (underBar) 0.dp else 56.dp)) { content() }
+        TopBar(current, "Alex", null, {}, {}, {}, {}, {})
     }
+}
+
+private fun fakeItem(name: String, year: Int, minutes: Int, genres: List<String>, kind: BaseItemKind = BaseItemKind.MOVIE, overview: String = "") =
+    BaseItemDto(
+        id = UUID.nameUUIDFromBytes(name.toByteArray()), type = kind, name = name, productionYear = year,
+        runTimeTicks = minutes * 600_000_000L, genres = genres, overview = overview,
+    )
+
+private fun fakeHome() = HomeState().apply {
+    featured = listOf(
+        fakeItem(
+            "The Long Harbour", 2019, 128, listOf("Drama", "Mystery"),
+            overview = "A harbour pilot returns to the fishing town she left at sixteen, where a missing trawler and an old promise " +
+                "pull her back into a quarrel nobody else remembers.",
+        ),
+        fakeItem("Paper Lanterns", 2004, 104, listOf("Romance")), fakeItem("Northern Static", 2021, 117, listOf("Sci-Fi")),
+    )
+    rows = listOf(
+        HomeRowData("resume", "Continue watching", posters.take(6).map { fakeItem(it.name, it.year ?: 2000, 95, emptyList()) }, wide = true),
+        HomeRowData("recent", "New on Living Room", posters.map { fakeItem(it.name, it.year ?: 2000, 100, emptyList()) }),
+        HomeRowData("top", "Critically acclaimed", posters.reversed().map { fakeItem(it.name, it.year ?: 2000, 100, emptyList()) }),
+    )
+    loaded = true
 }
 
 fun main(args: Array<String>) {
     val out = File(args.firstOrNull() ?: "build/shots").apply { mkdirs() }
+
+    Shot(out) { ShellLook("Home", underBar = true) { HomeScreen(androidx.compose.runtime.remember { fakeHome() }, Pictures.None, {}, {}, { _, _ -> }) } }
+        .hover("tile-Northern Static").save("desktop-home.png")
 
     Shot(out) {
         ServerScreen(

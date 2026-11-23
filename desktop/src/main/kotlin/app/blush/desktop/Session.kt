@@ -24,6 +24,7 @@ sealed interface Screen {
     data object Profiles : Screen
     /** Typing a password for [profile], or (when null) a name and password for someone not listed. */
     data class Password(val profile: Profile?) : Screen
+    data object Home : Screen
     data object Libraries : Screen
     data class Library(val library: BaseItemDto) : Screen
 }
@@ -50,13 +51,31 @@ class Session(val scope: CoroutineScope) {
 
     var screen: Screen by mutableStateOf(Screen.Starting)
         private set
+
+    /** Home's rows and banner, kept while browsing so coming back is instant; started afresh for each sign-in. */
+    var home by mutableStateOf(HomeState())
+        private set
+
+    /** A short message at the bottom of the window (e.g. for things not built yet on the Mac). */
+    var toastText by mutableStateOf<String?>(null)
+        private set
+    private var toastJob: kotlinx.coroutines.Job? = null
+
+    fun toast(text: String) {
+        toastText = text
+        toastJob?.cancel()
+        toastJob = scope.launch { kotlinx.coroutines.delay(2_800); toastText = null }
+    }
     private val history = mutableStateListOf<Screen>()
 
     /** Opens [next]; Back returns here. */
     fun go(next: Screen) { history += screen; screen = next }
 
     /** Replaces the whole history with [next] (after signing in or out). */
-    fun reset(next: Screen) { history.clear(); screen = next }
+    fun reset(next: Screen) {
+        if (next == Screen.Home && screen !is Screen.Libraries && screen !is Screen.Library && screen != Screen.Home) home = HomeState()
+        history.clear(); screen = next
+    }
 
     val canGoBack: Boolean get() = history.isNotEmpty()
 
@@ -104,13 +123,13 @@ class Session(val scope: CoroutineScope) {
     suspend fun choose(p: Profile): String? {
         p.saved?.let { saved ->
             when (repo.validate(saved)) {
-                true -> { reset(Screen.Libraries); return null }
+                true -> { reset(Screen.Home); return null }
                 null -> return "Couldn't reach the server. Check it's on, then try again."
                 false -> Unit // The sign-in has expired: ask for the password again.
             }
         }
         if (!p.hasPassword) {
-            runCatching { repo.signIn(p.name, "") }.onSuccess { reset(Screen.Libraries); return null }
+            runCatching { repo.signIn(p.name, "") }.onSuccess { reset(Screen.Home); return null }
         }
         go(Screen.Password(p))
         return null
@@ -118,7 +137,7 @@ class Session(val scope: CoroutineScope) {
 
     suspend fun signIn(name: String, password: String) {
         repo.signIn(name, password)
-        reset(Screen.Libraries)
+        reset(Screen.Home)
     }
 
     fun switchProfile() { reset(Screen.Profiles) }
