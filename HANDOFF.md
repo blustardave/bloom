@@ -129,7 +129,11 @@ Shared with the Mac app: `shared/src/commonMain/kotlin/app/blush/tv/` (same pack
 - Owner: the slowness is buttons reacting to the pointer/clicks. `HoverPill` now has no fades or press-dip animation (states
   snap, like Mac buttons). New `Perf.kt`: View → Show performance (⌥⌘P) overlay with click→drawn, pointer→drawn and draw time
   (last + worst), measured by `Modifier.perfMeasured()` on the window root. `Shots.kt` prints the CI hover-frame time.
-- If it's still slow, the owner's overlay numbers decide next steps: big click/pointer→drawn with small "Drawing" = delay
+- Owner on 0.3.158 (M-series Mac): resize white edge gone; "feels somewhat faster". Overlay after 18 s: click→drawn 3.5 ms
+  (worst 170), pointer→drawn 28.9 ms (worst 114), drawing 0.5 ms (worst 1.2). So our UI code is cheap; the worst cases are
+  Java warming up in the first seconds, and hover lands ~2 frames after the move (Compose handles moves on the next frame).
+  Possible later: bundle Java 25 and its AOT cache (JEP 483/515) to cut warm-up. Kept the overlay for future screens.
+- Reading the overlay: big click/pointer→drawn with small "Drawing" = delay
   before Bloom gets the event or after it draws (Java/Metal pipeline, JIT warm-up); big "Drawing" = our UI code.
 
 ### Build 239 → app 0.3.156 (Mac: no white edge while resizing, faster launches; TV unchanged)
