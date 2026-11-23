@@ -24,12 +24,15 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
@@ -47,6 +50,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import app.blush.tv.ui.theme.Blush
 import coil3.compose.AsyncImage
 
@@ -130,6 +134,7 @@ fun Field(
 ) {
     val h = rememberHover()
     val colors = Blush.colors
+    var focused by remember { mutableStateOf(false) }
     BasicTextField(
         value = value,
         onValueChange = onChange,
@@ -142,6 +147,7 @@ fun Field(
         interactionSource = h.source,
         modifier = modifier
             .then(if (focus != null) Modifier.focusRequester(focus) else Modifier)
+            .onFocusChanged { focused = it.isFocused }
             // Return submits (the desktop text field doesn't always pass it to keyboardActions).
             .onPreviewKeyEvent { e -> if (e.type == KeyEventType.KeyDown && (e.key == Key.Enter || e.key == Key.NumPadEnter)) { onDone(); true } else false }
             .pointerHoverIcon(PointerIcon.Text)
@@ -149,8 +155,8 @@ fun Field(
         decorationBox = { inner ->
             Box(
                 Modifier.fillMaxWidth().height(42.dp).clip(RoundedCornerShape(10.dp))
-                    .background(if (h.hovered && !h.focused) colors.surfaceRaised else colors.surface)
-                    .border(1.dp, if (h.focused) colors.accent.color.copy(alpha = 0.8f) else Color.White.copy(alpha = 0.08f), RoundedCornerShape(10.dp))
+                    .background(if (h.hovered && !focused) colors.surfaceRaised else colors.surface)
+                    .border(1.dp, if (focused) colors.accent.color.copy(alpha = 0.8f) else Color.White.copy(alpha = 0.08f), RoundedCornerShape(10.dp))
                     .padding(horizontal = 14.dp),
                 contentAlignment = Alignment.CenterStart,
             ) {
@@ -165,7 +171,7 @@ fun Field(
 @Composable
 fun Avatar(name: String, imageUrl: String?, size: Dp, modifier: Modifier = Modifier) {
     Box(modifier.size(size).clip(CircleShape).background(tintFor(name)), contentAlignment = Alignment.Center) {
-        Text(name.take(1).uppercase(), style = DesktopType.headline.copy(fontSize = DesktopType.headline.fontSize * (size.value / 96f)), color = Color.White.copy(alpha = 0.9f))
+        Text(name.take(1).uppercase(), style = DesktopType.headline.copy(fontSize = (size.value * 0.42f).sp), color = Color.White.copy(alpha = 0.9f))
         if (imageUrl != null) AsyncImage(imageUrl, contentDescription = name, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
     }
 }

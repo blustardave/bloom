@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -70,7 +71,7 @@ data class PosterCard(val name: String, val year: Int?, val imageUrl: String?, v
 fun TopBar(userName: String, userImage: String?, onLibraries: () -> Unit, onSwitchProfile: () -> Unit, onSignOut: () -> Unit, onChangeServer: () -> Unit) {
     Box(Modifier.fillMaxWidth().height(56.dp)) {
         LocalDragArea.current(Modifier.fillMaxSize())
-        Row(Modifier.fillMaxSize().padding(start = TrafficLights, end = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.fillMaxSize().padding(start = TrafficLights, end = PageSide - 2.dp), verticalAlignment = Alignment.CenterVertically) {
             val mark = remember { resourceImage("bloom_wordmark.png") }
             Image(mark, contentDescription = "Bloom", modifier = Modifier.height(20.dp).aspectRatio(430f / 112f))
             Spacer(Modifier.width(28.dp))
@@ -217,7 +218,7 @@ fun LibraryScreen(title: String, total: Int?, posters: List<PosterCard>, error: 
     Column(Modifier.fillMaxSize().padding(horizontal = PageSide)) {
         Spacer(Modifier.height(8.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            TextLink("‹ Libraries", onBack, Modifier.padding(end = 10.dp))
+            TextLink("‹ Libraries", onBack, Modifier.offset(x = (-8).dp))
         }
         Spacer(Modifier.height(4.dp))
         Row(verticalAlignment = Alignment.Bottom) {
