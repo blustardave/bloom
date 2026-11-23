@@ -1,0 +1,14 @@
+# Baseline profile: tells Android to pre-compile these on install instead of interpreting them for the first minutes.
+# H = hot, S = startup, P = post-startup. Wildcards cover the whole app and the UI libraries it leans on.
+HSPLapp/blush/tv/**;->**(**)**
+Lapp/blush/tv/**;
+HSPLandroidx/compose/foundation/**;->**(**)**
+Landroidx/compose/foundation/**;
+HSPLandroidx/compose/ui/**;->**(**)**
+Landroidx/compose/ui/**;
+HSPLandroidx/compose/runtime/**;->**(**)**
+Landroidx/compose/runtime/**;
+HSPLandroidx/compose/animation/**;->**(**)**
+Landroidx/compose/animation/**;
+HSPLcoil3/**;->**(**)**
+Lcoil3/**;

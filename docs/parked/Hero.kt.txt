@@ -1,0 +1,343 @@
+// PARKED: the Home banner (featured films), taken out of HomeScreen.kt on 2026-11-09 so Home could be rebuilt.
+// Not compiled. See docs/HERO_SPEC.md. Constants: HeroHeight = 456.dp; BannerButtonsBottom etc. live in components/BannerInfo.kt.
+
+// ===== Pieces of HomeModel =====
+    var featured by mutableStateOf<List<BaseItemDto>>(emptyList())
+    var heroIndex by mutableIntStateOf(0)
+    var lastHeroChange by mutableLongStateOf(System.currentTimeMillis())
+    var pagerFocused by mutableStateOf(false)
+    var heroFocused by mutableStateOf(true)
+    var focusedItem by mutableStateOf<BaseItemDto?>(null)
+    /** The focused tile's key (row + title), since the same title can appear in more than one row. */
+    var focusedKey by mutableStateOf<String?>(null)
+    /** The last row tile you were on, for moving down from the banner. */
+    var lastTileKey: String? = null
+    var rows by mutableStateOf<List<HomeRow>>(emptyList())
+    /** Rows that have already faded in once (they don't fade again when scrolled back into view). */
+    val appeared = mutableSetOf<String>()
+    /** Rows only fade in during the first few seconds of loading; later ones (scrolled to) just appear. */
+    var fadeRowsUntil = 0L
+    var loaded by mutableStateOf(false)
+    var error by mutableStateOf<String?>(null)
+    val listState = LazyListState()
+    val focus = FocusMemory()
+    val railReturn = RailReturn()
+    /** Set when you come back to Home from another tab: start again at the top. */
+    var goToTop by mutableStateOf(false)
+
+    fun showHero(index: Int) {
+        if (featured.isEmpty()) return
+        heroIndex = ((index % featured.size) + featured.size) % featured.size
+        lastHeroChange = System.currentTimeMillis()
+    }
+// featured load: featured = featuredJob.await(); lastHeroChange = now  (featuredJob = repo.featured(8))
+
+// ===== In HomeScreen(): choosing what's shown, rotation, layout =====
+    val hero = model.featured.getOrNull(model.heroIndex)
+    // What the banner is actually showing. It only moves on to the next title once that title's artwork and logo
+    // are loaded, so the picture, logo, text and buttons all change at the same moment (the artwork used to arrive
+    // a beat after everything else). The title after it is loaded in the background, ready.
+    val heroPx = with(density) { LocalConfiguration.current.let { it.screenWidthDp.dp.roundToPx() to it.screenHeightDp.dp.roundToPx() } }
+    var shownHero by remember { mutableStateOf<BaseItemDto?>(null) }
+    suspend fun warm(item: BaseItemDto) {
+        val loader = coil3.SingletonImageLoader.get(context)
+        coroutineScope {
+            repo.backdropUrl(item)?.let { url -> launch { loader.execute(heroRequest(context, url, heroPx)) } }
+            repo.logoUrl(item)?.let { url ->
+                launch { loader.execute(coil3.request.ImageRequest.Builder(context).data(url).size(coil3.size.Size.ORIGINAL).build()) }
+            }
+        }
+    }
+    LaunchedEffect(hero?.id) {
+        val next = hero ?: return@LaunchedEffect
+        withTimeoutOrNull(4_000) { warm(next) }
+        shownHero = next
+        model.featured.getOrNull((model.heroIndex + 1) % model.featured.size.coerceAtLeast(1))?.let { launch { warm(it) } }
+    }
+    // Rotate the banner every few seconds, but only while you're on it and not flicking through it by hand.
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(1000)
+            val idle = System.currentTimeMillis() - model.lastHeroChange > 9000
+            if (idle && model.featured.size > 1 && model.heroFocused && !model.pagerFocused) model.showHero(model.heroIndex + 1)
+        }
+    }
+
+
+    // After 10 seconds without touching the remote on the banner, the description fades and the logo settles lower.
+    var lastInput by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    var idle by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(500)
+            idle = model.heroFocused && System.currentTimeMillis() - lastInput > 5_000
+        }
+    }
+    val idleAmount by animateFloatAsState(if (idle) 1f else 0f, tween(if (idle) 1200 else 400), label = "idle")
+
+    // How far the banner has scrolled away; the banner text moves up with the list.
+    val heroScroll by remember {
+        derivedStateOf { if (model.listState.firstVisibleItemIndex == 0) model.listState.firstVisibleItemScrollOffset else Int.MAX_VALUE / 4 }
+    }
+    val heroAlpha by animateFloatAsState(if (model.heroFocused) 1f else 0f, tween(300), label = "heroAlpha")
+    // On first load the banner's text and buttons fade in once there's something to show.
+    val heroIntro by animateFloatAsState(if (shownHero != null || model.loaded) 1f else 0f, tween(600), label = "heroIntro")
+
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(Blush.colors.background)
+            .onFocusChanged { homeHasFocus = it.hasFocus }
+            .onPreviewKeyEvent {
+                lastInput = System.currentTimeMillis()
+                idle = false
+                false
+            },
+    ) {
+        // The banner's artwork. It scrolls up with the list as one piece, so moving down to the rows is a single
+        // smooth slide, and it blends into the plain background at its bottom edge.
+        Box(Modifier.fillMaxSize().offset { IntOffset(0, -heroScroll) }) {
+            HeroBackdrop(shownHero?.let { repo.backdropUrl(it) }, heroPx)
+            Box(
+                Modifier.fillMaxSize().background(
+                    Brush.horizontalGradient(0f to Blush.colors.background.copy(alpha = 0.95f), 0.42f to Blush.colors.background.copy(alpha = 0.55f), 0.75f to Color.Transparent),
+                ),
+            )
+            Box(
+                Modifier.fillMaxSize().background(
+                    Brush.verticalGradient(0.45f to Color.Transparent, 0.78f to Blush.colors.background.copy(alpha = 0.85f), 1f to Blush.colors.background),
+                ),
+            )
+        }
+
+        // Banner text and buttons, moving up with the list.
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(HeroHeight)
+                .offset { IntOffset(0, -heroScroll) }
+                .graphicsLayer {
+                    alpha = heroAlpha * heroIntro
+                    compositingStrategy = CompositingStrategy.ModulateAlpha
+                }
+                .onFocusChanged {
+                    // Only switch to "on the banner" here; leaving for the side bar shouldn't change what's shown.
+                    if (it.hasFocus) {
+                        model.heroFocused = true
+                        scope.launch { model.listState.animateScrollToItem(0) }
+                    }
+                }
+                .onPreviewKeyEvent { e ->
+                    if (e.type != KeyEventType.KeyDown || e.key != Key.DirectionDown) return@onPreviewKeyEvent false
+                    model.focusRow(0)
+                },
+        ) {
+            HeroBlock(app, model, shownHero) { idleAmount }
+// ===== Hero composables =====
+
+/** The banner artwork request, sized to the screen; the same one is used to pre-load it. */
+private fun heroRequest(context: android.content.Context, url: String, sizePx: Pair<Int, Int>) =
+    coil3.request.ImageRequest.Builder(context).data(url).size(sizePx.first, sizePx.second).build()
+
+/** One picture layer of the banner artwork. */
+private class BackdropLayer {
+    var url by mutableStateOf<String?>(null)
+    val alpha = androidx.compose.animation.core.Animatable(0f)
+    var z by mutableFloatStateOf(0f)
+}
+
+/**
+ * The banner artwork. Two layers take turns: the next picture loads on the layer on top while it's still invisible,
+ * and only once it's ready does it fade in over the current one. So titles always melt into one another (no dip
+ * to black while a picture loads), and the very first one fades in from the background.
+ */
+@Composable
+private fun HeroBackdrop(url: String?, sizePx: Pair<Int, Int>) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val layers = remember { listOf(BackdropLayer(), BackdropLayer()) }
+    var top by remember { mutableIntStateOf(-1) }
+    LaunchedEffect(url) {
+        if (url == null || (top >= 0 && layers[top].url == url)) return@LaunchedEffect
+        val next = if (top == 0) 1 else 0
+        val layer = layers[next]
+        val sameAsBefore = layer.url == url
+        layer.alpha.snapTo(0f)
+        layer.z = (if (top >= 0) layers[top].z else 0f) + 1f
+        layer.url = url
+        top = next
+        // Already loaded on this layer (flicking back and forth), so there's no load to wait for.
+        if (sameAsBefore) layer.alpha.animateTo(1f, tween(900))
+    }
+    Box(Modifier.fillMaxSize()) {
+        layers.forEach { layer ->
+            val u = layer.url ?: return@forEach
+            // Exactly the request the banner pre-loads with, so it comes straight from memory.
+            val request = remember(u) { heroRequest(context, u, sizePx) }
+            coil3.compose.AsyncImage(
+                model = request,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                onSuccess = { scope.launch { layer.alpha.animateTo(1f, tween(900)) } },
+                modifier = Modifier.fillMaxSize().zIndex(layer.z).graphicsLayer {
+                    alpha = layer.alpha.value
+                    compositingStrategy = CompositingStrategy.ModulateAlpha
+                },
+            )
+        }
+    }
+}
+
+/** The preview player, which tile it belongs to, and how faded in it is. */
+
+@Composable
+private fun HeroBlock(app: AppState, model: HomeModel, hero: BaseItemDto?, idle: () -> Float) {
+    val repo = app.repo
+    val scope = rememberCoroutineScope()
+    Box(Modifier.fillMaxSize()) {
+        Column(
+            Modifier.align(Alignment.BottomStart).padding(start = ContentStart, bottom = HeroHeight - BannerButtonsBottom),
+            verticalArrangement = Arrangement.spacedBy(BannerButtonsGap),
+        ) {
+            if (hero == null) {
+                if (model.loaded) {
+                    val problem = model.error
+                    if (problem != null) {
+                        Text("Can't load Home", style = BlushType.display)
+                        Text(problem, style = BlushType.body, color = Blush.colors.textMuted)
+                        SecondaryButton(
+                            "Try again",
+                            null,
+                            onClick = {
+                                scope.launch {
+                                    model.error = null
+                                    model.loaded = false
+                                    model.load()
+                                }
+                            },
+                            modifier = Modifier.restorableFocus(model.focus, "hero-play", isDefault = true),
+                        )
+                    } else {
+                        Text("Welcome to Bloom", style = BlushType.display)
+                        Text("Add some films or series to your server and they'll show up here.", style = BlushType.body, color = Blush.colors.textMuted)
+                    }
+                }
+                return@Column
+            }
+            // One title simply fades into the next.
+            Crossfade(targetState = hero, animationSpec = tween(700), label = "heroText") { item -> BannerTitleInfo(repo, item, idle) }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                PrimaryButton(
+                    if (hero.progress() != null) "Resume" else "Play",
+                    Icons.Play,
+                    onClick = {
+                        if (hero.type == BaseItemKind.SERIES) {
+                            scope.launch {
+                                val episode = runCatching { repo.nextEpisodeFor(hero.id) }.getOrNull()
+                                if (episode != null) app.go(Route.Player(episode)) else app.go(Route.Details(hero.id))
+                            }
+                        } else {
+                            app.go(Route.Player(hero))
+                        }
+                    },
+                    progress = hero.progress(),
+                    // Remembered so leaving for the side bar and coming back returns here, not to a row further down.
+                    // Fixed width, so Play and Resume are the same size.
+                    modifier = Modifier
+                        .width(112.dp)
+                        .onFocusChanged { if (it.hasFocus) model.focus.remember("hero-play") }
+                        .restorableFocus(model.focus, "hero-play", isDefault = true),
+                )
+                SecondaryButton(
+                    "More info",
+                    null,
+                    onClick = { model.focus.remember("hero-info"); app.go(Route.Details(hero.id, preview = hero)) },
+                    modifier = Modifier
+                        .onFocusChanged { if (it.hasFocus) model.focus.remember("hero-info") }
+                        // Right goes to the dots under the banner.
+                        .onPreviewKeyEvent { e ->
+                            e.type == KeyEventType.KeyDown && e.key == Key.DirectionRight && model.focus.requestKey("hero-dots")
+                        }
+                        .restorableFocus(model.focus, "hero-info"),
+                )
+            }
+        }
+        if (model.featured.size > 1) {
+            Dots(model, Modifier.align(Alignment.BottomCenter).padding(bottom = 14.dp))
+        }
+    }
+}
+
+/**
+ * The banner's position dots, centred under it. Only a handful show at once; the rest fade off at the sides
+ * and slide into view as you move along. Focus them to flick through with Left and Right; Up goes back to the
+ * buttons.
+ */
+@Composable
+private fun Dots(model: HomeModel, modifier: Modifier = Modifier) {
+    val interaction = remember { MutableInteractionSource() }
+    val focused by interaction.collectIsFocusedAsState()
+    LaunchedEffect(focused) { model.pagerFocused = focused }
+    val count = model.featured.size
+    val window = minOf(5, count)
+    val slot = 13.dp
+    val first = (model.heroIndex - window / 2).coerceIn(0, (count - window).coerceAtLeast(0))
+    val shift by animateDpAsState(-slot * first, tween(300), label = "dotsShift")
+    val density = LocalDensity.current
+    val edge = with(density) { 14.dp.toPx() }
+    Box(
+        modifier
+            .onFocusChanged { if (it.hasFocus) model.focus.remember("hero-dots") }
+            .restorableFocus(model.focus, "hero-dots")
+            .clip(RoundedCornerShape(50))
+            .background(if (focused) Color.White.copy(alpha = 0.14f) else Color.Transparent)
+            .onKeyEvent { e ->
+                if (e.type != KeyEventType.KeyDown) return@onKeyEvent false
+                when (e.key) {
+                    Key.DirectionRight -> { model.showHero(model.heroIndex + 1); true }
+                    Key.DirectionLeft -> { model.showHero(model.heroIndex - 1); true }
+                    Key.DirectionUp -> model.focus.requestKey("hero-info")
+                    else -> false
+                }
+            }
+            .focusable(interactionSource = interaction)
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+    ) {
+        Box(
+            Modifier
+                .width(slot * window)
+                .height(8.dp)
+                .clipToBounds()
+                // Fade the dots out towards each end when there are more beyond them.
+                .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                .drawWithContent {
+                    drawContent()
+                    val leftFade = if (first > 0) 0f else 1f
+                    val rightFade = if (first + window < count) 0f else 1f
+                    drawRect(
+                        Brush.horizontalGradient(
+                            0f to Color.Black.copy(alpha = leftFade),
+                            edge / size.width to Color.Black,
+                            1f - edge / size.width to Color.Black,
+                            1f to Color.Black.copy(alpha = rightFade),
+                        ),
+                        blendMode = BlendMode.DstIn,
+                    )
+                },
+        ) {
+            Row(Modifier.wrapContentWidth(unbounded = true, align = Alignment.Start).offset(x = shift), verticalAlignment = Alignment.CenterVertically) {
+                model.featured.indices.forEach { i ->
+                    val size by animateDpAsState(if (i == model.heroIndex) 7.dp else 4.dp, tween(300), label = "dot")
+                    Box(Modifier.width(slot).height(8.dp), contentAlignment = Alignment.Center) {
+                        Box(
+                            Modifier
+                                .size(size)
+                                .clip(CircleShape)
+                                .background(if (i == model.heroIndex) Color.White else Color.White.copy(alpha = 0.4f)),
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
