@@ -20,10 +20,26 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
       # Build number = run number + 236: the repository was recreated (23 Nov 2026) after the old one reached run 236, and
       # each new APK must have a higher number than the last or the Fire Stick won't install it over the top.
       - name: Work out the build number
         run: echo "BLOOM_BUILD=$(( ${{ github.run_number }} + 236 ))" >> "$GITHUB_ENV"
+      # Only rebuild the app(s) a push touches: app/ → TV, desktop/ → Mac, shared/ or the build set-up → both.
+      # A manual run (workflow_dispatch) or a push whose start can't be compared builds both.
+      - name: Which apps changed
+        run: |
+          BEFORE="${{ github.event.before }}"
+          if [ "${{ github.event_name }}" = "push" ] && [ -n "$BEFORE" ] && git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            CHANGED=$(git diff --name-only "$BEFORE" "${{ github.sha }}")
+          else
+            CHANGED="(everything)"
+          fi
+          echo "Changed files:"; echo "$CHANGED"
+          BOTH='^(shared/|gradle/|build\.gradle\.kts|settings\.gradle\.kts|gradle\.properties|gradlew|\.github/)'
+          if [ "$CHANGED" = "(everything)" ] || echo "$CHANGED" | grep -qE "$BOTH|^app/"; then echo "BUILD_TV=true" >> "$GITHUB_ENV"; fi
+          if [ "$CHANGED" = "(everything)" ] || echo "$CHANGED" | grep -qE "$BOTH|^desktop/"; then echo "BUILD_MAC=true" >> "$GITHUB_ENV"; fi
       - name: Set up Java
         uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
@@ -31,73 +47,87 @@ jobs:
           java-version: 21
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+
+      # ---------- TV app ----------
       - name: Build release APK
+        if: env.BUILD_TV == 'true'
         run: ./gradlew assembleRelease --stacktrace
       - name: Collect APKs
+        if: env.BUILD_TV == 'true'
         run: |
           mkdir -p out
           cp app/build/outputs/apk/release/*.apk out/bloom-release.apk
       - name: Show what the APK declares (icon, banner, version)
+        if: env.BUILD_TV == 'true'
         run: |
           AAPT2=$(ls -d "$ANDROID_HOME"/build-tools/*/aapt2 | sort -V | tail -1)
           "$AAPT2" dump badging out/bloom-release.apk | grep -E "^package:|icon|banner|launchable" || true
           "$AAPT2" dump resources out/bloom-release.apk | grep -A3 "drawable/banner" || true
       - name: Publish the APK as the "latest" release (doesn't count towards Actions storage)
-        if: github.ref == 'refs/heads/main'
+        if: env.BUILD_TV == 'true' && github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release view latest -R "${{ github.repository }}" >/dev/null 2>&1 || \
             gh release create latest -R "${{ github.repository }}" --title "Latest build" --notes "Newest Bloom build from main." --prerelease
           gh release upload latest out/bloom-release.apk -R "${{ github.repository }}" --clobber
-          gh release edit latest -R "${{ github.repository }}" --notes "Bloom 0.3.$(( BLOOM_BUILD - 83 )) (build $BLOOM_BUILD, run ${{ github.run_number }})"
-      - name: Upload APKs
-        continue-on-error: true
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: bloom-apks
-          retention-days: 2
-          if-no-files-found: error
-          path: out/
+          .github/release-notes.sh "TV app" "0.3.$(( BLOOM_BUILD - 83 ))"
       - name: Cache Robolectric's Android runtime (Maven Central rate-limits repeated downloads)
+        if: env.BUILD_TV == 'true'
         uses: actions/cache@v4
         with:
           path: ~/.m2/repository/org/robolectric
           key: robolectric-android-all-15
       - name: Render the player prompts (screenshots)
+        if: env.BUILD_TV == 'true'
         continue-on-error: true
         run: ./gradlew :app:testDebugUnitTest --tests 'app.blush.tv.PromptShots' --stacktrace
+
+      # ---------- Mac app ----------
       - name: Render the Mac app's screens (screenshots)
+        if: env.BUILD_MAC == 'true'
         continue-on-error: true
-        run: |
-          ./gradlew :desktop:shots --stacktrace
-          mkdir -p app/build/shots
-          cp desktop/build/shots/*.png app/build/shots/
+        run: ./gradlew :desktop:shots --stacktrace
+
+      # Screenshots: start from what's on the shots branch, so a TV-only or Mac-only build keeps the other app's pictures.
       - name: Publish screenshots to the shots branch
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' && (env.BUILD_TV == 'true' || env.BUILD_MAC == 'true')
         continue-on-error: true
         run: |
-          mkdir -p app/build/shots && cd app/build/shots
+          REPO="https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
+          rm -rf shots-out && mkdir shots-out
+          git clone -q --depth 1 -b shots "$REPO" old-shots 2>/dev/null && cp old-shots/*.png shots-out/ 2>/dev/null || true
+          cp app/build/shots/*.png shots-out/ 2>/dev/null || true
+          cp desktop/build/shots/*.png shots-out/ 2>/dev/null || true
+          cd shots-out
           git init -q && git checkout -q -b shots
           git add . && git -c user.name=ci -c user.email=ci@users.noreply.github.com commit -qm "Screenshots from build $BLOOM_BUILD"
-          git push -qf "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" shots
-      # The Mac app: built here on Linux (no Mac runner), as Bloom.app for Apple Silicon, and published next to the APK.
+          git push -qf "$REPO" shots
+
       - name: Which month (refreshes the cached Java runtime monthly)
+        if: env.BUILD_MAC == 'true'
         id: month
         run: echo "m=$(date +%Y-%m)" >> "$GITHUB_OUTPUT"
       - name: Cache the Mac Java runtime
+        if: env.BUILD_MAC == 'true'
         uses: actions/cache@v4
         with:
           path: ~/.cache/bloom-jre
           key: temurin-21-jre-mac-aarch64-${{ steps.month.outputs.m }}
+      # Built here on Linux (no Mac runner), as Bloom.app for Apple Silicon, and published next to the APK.
       - name: Build the Mac app (Bloom.app)
+        if: env.BUILD_MAC == 'true'
         run: |
           ./gradlew :desktop:appJar -PdesktopTarget=macos-arm64 --stacktrace
-          echo "Graphics libraries in the jar (must be macOS arm64 only):"
+          echo "Graphics libraries in the jar (must be macOS only):"
           unzip -l desktop/build/libs/bloom.jar | grep -iE "\.(dylib|so|dll)$" || true
           JRE_CACHE="$HOME/.cache/bloom-jre" desktop/mac/make-app.sh desktop/build/libs/bloom.jar "0.3.$(( BLOOM_BUILD - 83 ))" out-mac
       - name: Publish the Mac app to the "latest" release
-        if: github.ref == 'refs/heads/main'
+        if: env.BUILD_MAC == 'true' && github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload latest out-mac/Bloom-mac.zip -R "${{ github.repository }}" --clobber
+        run: |
+          gh release view latest -R "${{ github.repository }}" >/dev/null 2>&1 || \
+            gh release create latest -R "${{ github.repository }}" --title "Latest build" --notes "Newest Bloom build from main." --prerelease
+          gh release upload latest out-mac/Bloom-mac.zip -R "${{ github.repository }}" --clobber
+          .github/release-notes.sh "Mac app" "0.3.$(( BLOOM_BUILD - 83 ))"

@@ -33,7 +33,7 @@ the Fire Stick treat Bloom as a different app: sign-in and settings lost). Kotli
   `gh api repos/blustardave/bloom/actions/runs --jq '.workflow_runs[0]'`, then
   `gh api repos/blustardave/bloom/actions/jobs/<id>/logs | grep -E '^.{29}e: '`. The log also prints
   `aapt2 dump badging` (package, version, icon/banner) in the "Show what the APK declares" step.
-- Artifact: **`bloom-apks`**, containing `bloom-release.apk`. Signed with `app/blush.keystore` (password
+- APK: `bloom-release.apk` on the `latest` release (the old `bloom-apks` artifact is gone). Signed with `app/blush.keystore` (password
   `blushblush`), so every build installs over the last.
 - **Versions:** versionCode = **build number = Actions run number + 236** (the repo was recreated on 23 Nov 2026 and its
   runs restarted at 1; "run N" earlier in this file means build N). versionName = `0.3.<build − 83>`, set in
@@ -124,6 +124,18 @@ Shared with the Mac app: `shared/src/commonMain/kotlin/app/blush/tv/` (same pack
   rows, `PivotScroll` pausing, and Back handling everywhere.
 
 ## Change history (newest first)
+
+### Build 247 → app 0.3.164 (CI builds only what changed; Mac: ⌘W, library names; TV unchanged)
+- Owner: Mac sign-in and libraries work on the real server; window drags fine by the top edge. Asked whether every change
+  rebuilds the APK.
+- CI now has a "Which apps changed" step (diff of the push): `app/` → TV only, `desktop/` → Mac only, `shared/`, Gradle
+  files or `.github/` → both; manual runs build both. TV steps run under `env.BUILD_TV`, Mac under `env.BUILD_MAC`.
+  Release notes are one line per app (`.github/release-notes.sh`), so a Mac-only build doesn't claim a new APK. The shots
+  branch is rebuilt from its previous content plus the new pictures. The 2-day `bloom-apks` artifact upload was dropped
+  (the release has the APK). A skipped app keeps its last release file; versionCode still = run + 236 (gaps are fine).
+- Mac: Window menu with Close Window (⌘W, quits — single-window app) and Minimise (⌘M). Library tiles: Jellyfin's
+  library pictures have the name painted on, so the name is now written under the tile (beside the count), and on the tile
+  only when there's no picture.
 
 ### Builds 244–246 → app 0.3.161–0.3.163 (Mac port phase 2: sign in and browse libraries on the Mac; TV unchanged)
 - Shared data layer: `Repo`, `Store`, `HomeCache`, `FilteredPager` and `ui/Format.kt` moved to `shared/src/jvmShared/kotlin`

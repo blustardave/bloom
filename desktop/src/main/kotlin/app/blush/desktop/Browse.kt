@@ -32,7 +32,6 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.IntOffset
@@ -178,12 +177,20 @@ fun LibrariesScreen(libraries: List<LibraryCard>?, error: String?, onOpen: (Int)
 private fun LibraryTile(lib: LibraryCard, onClick: () -> Unit) {
     Column {
         HoverTile(onClick, Modifier.fillMaxWidth().aspectRatio(16f / 9f).probe(lib.name), background = tintFor(lib.name).copy(alpha = 0.6f)) {
-            if (lib.imageUrl != null) AsyncImage(lib.imageUrl, contentDescription = lib.name, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-            Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0.45f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.75f))))
-            Text(lib.name, Modifier.align(Alignment.BottomStart).padding(14.dp), style = DesktopType.title)
+            // Jellyfin's library pictures usually have the library's name painted on, so the name only goes on the tile
+            // when there's no picture; it is always written underneath.
+            if (lib.imageUrl != null) {
+                AsyncImage(lib.imageUrl, contentDescription = lib.name, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+            } else {
+                Text(lib.name, Modifier.align(Alignment.Center), style = DesktopType.headline, color = Color.White.copy(alpha = 0.85f))
+            }
         }
-        Spacer(Modifier.height(8.dp))
-        Text(lib.count?.let { "$it ${if (it == 1) "title" else "titles"}" } ?: " ", style = DesktopType.caption, color = Blush.colors.textDim)
+        Spacer(Modifier.height(9.dp))
+        Row(verticalAlignment = Alignment.Bottom) {
+            Text(lib.name, style = DesktopType.title)
+            Spacer(Modifier.width(8.dp))
+            Text(lib.count?.let { "$it ${if (it == 1) "title" else "titles"}" } ?: "", Modifier.padding(bottom = 1.dp), style = DesktopType.caption, color = Blush.colors.textDim)
+        }
     }
 }
 

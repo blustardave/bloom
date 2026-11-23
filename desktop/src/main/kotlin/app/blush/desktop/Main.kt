@@ -81,6 +81,11 @@ fun main() {
                 window.minimumSize = java.awt.Dimension(900, 600)
             }
             MenuBar {
+                Menu("Window") {
+                    // Bloom has one window, so closing it quits, as in most single-window Mac apps (⌘Q also quits).
+                    Item("Close Window", shortcut = KeyShortcut(Key.W, meta = true), onClick = ::exitApplication)
+                    Item("Minimise", shortcut = KeyShortcut(Key.M, meta = true)) { state.isMinimized = true }
+                }
                 Menu("Go") {
                     Item("Back", shortcut = KeyShortcut(Key.LeftBracket, meta = true), enabled = session.canGoBack, onClick = session::back)
                     Item("Libraries", shortcut = KeyShortcut(Key.L, meta = true, shift = true), enabled = session.repo.currentUser != null) {
