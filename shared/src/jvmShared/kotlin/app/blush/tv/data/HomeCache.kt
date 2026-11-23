@@ -23,7 +23,7 @@ object HomeCache {
     private fun file(repo: Repo): java.io.File? {
         val server = repo.store.server?.id ?: return null
         val user = repo.userId ?: return null
-        return java.io.File(repo.appContext.cacheDir, "home-$server-$user.json")
+        return java.io.File(repo.cacheDir, "home-$server-$user.json")
     }
 
     fun read(repo: Repo): SavedHome? = runCatching {

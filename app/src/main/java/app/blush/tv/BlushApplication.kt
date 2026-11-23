@@ -1,6 +1,7 @@
 package app.blush.tv
 
 import android.app.Application
+import app.blush.tv.data.AndroidPrefs
 import app.blush.tv.data.Repo
 import app.blush.tv.data.Store
 import coil3.ImageLoader
@@ -11,6 +12,9 @@ import coil3.disk.directory
 import coil3.memory.MemoryCache
 import coil3.request.allowRgb565
 import coil3.request.crossfade
+import org.jellyfin.sdk.android.androidDevice
+import org.jellyfin.sdk.createJellyfin
+import org.jellyfin.sdk.model.ClientInfo
 
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class BlushApplication : Application(), SingletonImageLoader.Factory {
@@ -20,7 +24,14 @@ class BlushApplication : Application(), SingletonImageLoader.Factory {
     override fun onCreate() {
         super.onCreate()
         CrashLog.install(this)
-        repo = Repo(this, Store(this))
+        // The server code is shared with the Mac app; only the SDK set-up, device name and settings file are Android's own.
+        val device = androidDevice(this)
+        val jellyfin = createJellyfin {
+            context = this@BlushApplication
+            clientInfo = ClientInfo("Bloom", BuildConfig.VERSION_NAME)
+            deviceInfo = device
+        }
+        repo = Repo(jellyfin, device, cacheDir, Store(AndroidPrefs(getSharedPreferences("blush", MODE_PRIVATE))))
     }
 
     // Generous image caches keep scrolling smooth on the Fire Stick.

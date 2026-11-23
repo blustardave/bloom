@@ -1,6 +1,5 @@
 package app.blush.tv.data
 
-import android.content.Context
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
@@ -21,9 +20,32 @@ data class SavedUser(
 @Serializable
 data class RailPin(val libraryId: String, val name: String, val icon: String)
 
+/**
+ * The few calls [Store] makes on its settings file, in the shape of Android's SharedPreferences: the TV app wraps those,
+ * the Mac app keeps a small JSON file.
+ */
+interface Prefs {
+    fun getString(key: String, default: String?): String?
+    fun getBoolean(key: String, default: Boolean): Boolean
+    fun getInt(key: String, default: Int): Int
+    fun getFloat(key: String, default: Float): Float
+    fun getStringSet(key: String, default: Set<String>?): Set<String>?
+    fun contains(key: String): Boolean
+    fun edit(): Editor
+
+    interface Editor {
+        fun putString(key: String, value: String?): Editor
+        fun putBoolean(key: String, value: Boolean): Editor
+        fun putInt(key: String, value: Int): Editor
+        fun putFloat(key: String, value: Float): Editor
+        fun putStringSet(key: String, value: Set<String>?): Editor
+        fun remove(key: String): Editor
+        fun apply()
+    }
+}
+
 /** Small persistent store for the server, signed-in profiles and app preferences. */
-class Store(context: Context) {
-    private val prefs = context.getSharedPreferences("blush", Context.MODE_PRIVATE)
+class Store(private val prefs: Prefs) {
     private val json = Json { ignoreUnknownKeys = true }
 
     var server: SavedServer?

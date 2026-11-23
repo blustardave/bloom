@@ -1,7 +1,5 @@
 package app.blush.tv.data
 
-import android.content.Context
-import app.blush.tv.BuildConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -26,11 +24,9 @@ import org.jellyfin.sdk.api.client.extensions.tvShowsApi
 import org.jellyfin.sdk.api.client.extensions.userApi
 import org.jellyfin.sdk.api.client.extensions.userLibraryApi
 import org.jellyfin.sdk.api.client.extensions.userViewsApi
-import org.jellyfin.sdk.android.androidDevice
-import org.jellyfin.sdk.createJellyfin
+import org.jellyfin.sdk.Jellyfin
 import org.jellyfin.sdk.discovery.RecommendedServerInfoScore
 import org.jellyfin.sdk.discovery.RecommendedServerIssue
-import org.jellyfin.sdk.model.ClientInfo
 import org.jellyfin.sdk.model.DeviceInfo
 import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.sdk.model.api.BaseItemKind
@@ -52,15 +48,11 @@ class ConnectException(message: String) : Exception(message)
 /** The width every poster tile asks the server for: a little over the widest a poster is drawn (about 300 pixels on a 1080p screen). */
 const val PosterTileWidth = 280
 
-class Repo(context: Context, val store: Store) {
-    val appContext: Context = context.applicationContext
-    private val baseDevice: DeviceInfo = androidDevice(context)
-
-    private val jellyfin = createJellyfin {
-        this.context = context
-        clientInfo = ClientInfo("Bloom", BuildConfig.VERSION_NAME)
-        deviceInfo = baseDevice
-    }
+/**
+ * Shared by the TV app and the Mac app. Each app makes its own [jellyfin] (the SDK is set up differently on Android) and
+ * says what device this is ([baseDevice]) and where cached files go ([cacheDir]).
+ */
+class Repo(private val jellyfin: Jellyfin, private val baseDevice: DeviceInfo, val cacheDir: java.io.File, val store: Store) {
 
     /** The API client for the signed-in user (or an anonymous one before sign-in). */
     var api: ApiClient = jellyfin.createApi()
@@ -464,7 +456,7 @@ class Repo(context: Context, val store: Store) {
     private fun creditFile(): java.io.File? {
         val server = store.server?.id ?: return null
         val user = userId ?: return null
-        return java.io.File(appContext.cacheDir, "credits-$server-$user.tsv")
+        return java.io.File(cacheDir, "credits-$server-$user.tsv")
     }
 
     private fun readCredits(allowOld: Boolean = false): CreditIndex? = runCatching {

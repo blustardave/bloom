@@ -1,9 +1,13 @@
-// Code shared by the TV app (Android) and the Mac app (desktop JVM). Only plain Kotlin and Compose go in commonMain;
-// anything that needs Android (ExoPlayer, SharedPreferences, resources) stays in :app for now.
+// Code shared by the TV app (Android) and the Mac app (desktop JVM).
+// - src/commonMain: plain Kotlin and Compose only.
+// - src/jvmShared: code that also needs Java's own library (files, UUIDs...) and the Jellyfin SDK: the server calls (Repo),
+//   settings (Store), caches. Both apps run on Java, so this folder is compiled into each of them.
+// Anything that needs Android itself (ExoPlayer, SharedPreferences, resources) stays in :app.
 plugins {
     id("org.jetbrains.kotlin.multiplatform")
     alias(libs.plugins.android.kmp.library)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 kotlin {
@@ -21,6 +25,13 @@ kotlin {
             api(libs.cmp.foundation)
             api(libs.cmp.ui)
             implementation(libs.kotlinx.coroutines.core)
+        }
+        for (name in listOf("androidMain", "desktopMain")) getByName(name) {
+            kotlin.srcDir("src/jvmShared/kotlin")
+            dependencies {
+                api(libs.jellyfin.sdk)
+                api(libs.kotlinx.serialization.json)
+            }
         }
     }
 }
