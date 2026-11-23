@@ -136,6 +136,9 @@ fun main(args: Array<String>) {
     Shot(out) { ShellLook("Home", underBar = true) { HomeScreen(androidx.compose.runtime.remember { fakeHome() }, Pictures.None, {}, {}, { _, _ -> }) } }
         .hover("card-Northern Static").save("desktop-home.png")
 
+    Shot(out) { ShellLook("Home", underBar = true) { HomeScreen(androidx.compose.runtime.remember { fakeHome() }, Pictures.None, {}, {}, { _, _ -> }) } }
+        .hover("nav-Libraries").save("desktop-nav.png")
+
     Shot(out) {
         ServerScreen(
             "192.168.1.20:8096", {}, {}, busy = false, error = null,
