@@ -1,6 +1,12 @@
 package app.blush.desktop
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyShortcut
+import androidx.compose.ui.window.MenuBar
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.unit.DpSize
@@ -35,8 +41,21 @@ fun main() = application {
             window.rootPane.putClientProperty("apple.awt.windowTitleVisible", false)
             window.minimumSize = java.awt.Dimension(900, 600)
         }
-        BlushTheme {
-            WelcomeScreen(bloomVersion)
+        MenuBar {
+            Menu("View") {
+                CheckboxItem(
+                    "Show performance",
+                    checked = Perf.shown,
+                    shortcut = KeyShortcut(Key.P, meta = true, alt = true),
+                    onCheckedChange = { Perf.shown = it },
+                )
+            }
+        }
+        Box(Modifier.fillMaxSize().perfMeasured()) {
+            BlushTheme {
+                WelcomeScreen(bloomVersion)
+            }
+            PerfOverlay()
         }
     }
 }

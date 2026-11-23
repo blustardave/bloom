@@ -39,6 +39,16 @@ fun main(args: Array<String>) {
 
     save("desktop-welcome.png")
 
+    // How long the screen takes to draw on the CI machine (software drawing, so slower than a Mac's graphics chip).
+    run {
+        repeat(30) { clock += 16_000_000L; scene.render(clock) }
+        val times = (1..60).map { i ->
+            scene.sendPointerEvent(PointerEventType.Move, centre(if (i % 2 == 0) "Outline" else "Light"))
+            val t = System.nanoTime(); clock += 16_000_000L; scene.render(clock); (System.nanoTime() - t) / 1e6
+        }.sorted()
+        println("Hover frame on CI: median %.1f ms, worst %.1f ms".format(times[times.size / 2], times.last()))
+    }
+
     // Pointer resting on "Outline" (hover state), nothing clicked.
     scene.sendPointerEvent(PointerEventType.Move, centre("Outline"))
     save("desktop-hover.png")

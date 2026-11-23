@@ -1,8 +1,5 @@
 package app.blush.desktop
 
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
@@ -20,7 +17,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.layout.boundsInRoot
@@ -37,35 +33,28 @@ object PointerProbe {
 }
 
 /**
- * A small pill-shaped choice: quiet at rest, brighter under the pointer, white when [selected]. Presses dip slightly so a
- * trackpad tap feels answered.
+ * A small pill-shaped choice: quiet at rest, brighter under the pointer, brighter still while pressed, white when [selected].
  */
 @Composable
 fun HoverPill(label: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier, probe: String = label) {
     val source = remember { MutableInteractionSource() }
     val hovered by source.collectIsHoveredAsState()
     val pressed by source.collectIsPressedAsState()
-    val bg by animateColorAsState(
-        when {
-            selected -> Color(0xFFF5F5F7)
-            hovered -> Color.White.copy(alpha = 0.16f)
-            else -> Color.White.copy(alpha = 0.07f)
-        },
-        tween(60),
-    )
-    val fg by animateColorAsState(
-        when {
-            selected -> Color(0xFF17181F)
-            hovered -> Color(0xFFF5F5F7)
-            else -> Color(0xFFAEB1BB)
-        },
-        tween(60),
-    )
-    val scale by animateFloatAsState(if (pressed) 0.96f else 1f, tween(90))
+    // No fades: on the Mac, buttons answer the pointer instantly. Any animation here reads as lag.
+    val bg = when {
+        selected -> Color(0xFFF5F5F7)
+        pressed -> Color.White.copy(alpha = 0.22f)
+        hovered -> Color.White.copy(alpha = 0.16f)
+        else -> Color.White.copy(alpha = 0.07f)
+    }
+    val fg = when {
+        selected -> Color(0xFF17181F)
+        hovered || pressed -> Color(0xFFF5F5F7)
+        else -> Color(0xFFAEB1BB)
+    }
     Box(
         modifier
             .onGloballyPositioned { PointerProbe.bounds[probe] = it.boundsInRoot() }
-            .graphicsLayer { scaleX = scale; scaleY = scale }
             .height(28.dp)
             .background(bg, RoundedCornerShape(50))
             .pointerHoverIcon(PointerIcon.Hand)

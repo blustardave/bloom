@@ -125,6 +125,13 @@ Shared with the Mac app: `shared/src/commonMain/kotlin/app/blush/tv/` (same pack
 
 ## Change history (newest first)
 
+### Build 240 → app 0.3.157 (Mac: instant button states, View → Show performance; TV unchanged)
+- Owner: the slowness is buttons reacting to the pointer/clicks. `HoverPill` now has no fades or press-dip animation (states
+  snap, like Mac buttons). New `Perf.kt`: View → Show performance (⌥⌘P) overlay with click→drawn, pointer→drawn and draw time
+  (last + worst), measured by `Modifier.perfMeasured()` on the window root. `Shots.kt` prints the CI hover-frame time.
+- If it's still slow, the owner's overlay numbers decide next steps: big click/pointer→drawn with small "Drawing" = delay
+  before Bloom gets the event or after it draws (Java/Metal pipeline, JIT warm-up); big "Drawing" = our UI code.
+
 ### Build 239 → app 0.3.156 (Mac: no white edge while resizing, faster launches; TV unchanged)
 - Owner tried Bloom.app on the Mac: opens, hover/click work, Dock icon shows. Reported: "feels a little slow" and a trailing
   white border while resizing.
