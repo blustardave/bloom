@@ -125,6 +125,24 @@ Shared with the Mac app: `shared/src/commonMain/kotlin/app/blush/tv/` (same pack
 
 ## Change history (newest first)
 
+### Builds 246–247 → app 0.3.163–0.3.164 (Mac port phase 2: sign in and browse libraries on the Mac; TV unchanged)
+- Shared data layer: `Repo`, `Store`, `HomeCache`, `FilteredPager` and `ui/Format.kt` moved to `shared/src/jvmShared/kotlin`
+  (same packages), a folder compiled into both the Android and desktop targets because it needs the JDK and Jellyfin SDK.
+  `Repo(jellyfin, baseDevice, cacheDir, store)`: each app builds its own SDK instance (Android needs a Context) — see
+  `BlushApplication.onCreate`. `Store(prefs: Prefs)`: `Prefs` mirrors the SharedPreferences calls Store uses; TV wraps
+  SharedPreferences (`data/AndroidPrefs.kt`), Mac uses `DesktopPrefs` (JSON in ~/Library/Application Support/Bloom,
+  owner-only file). Playback's device profile now takes `BlushApplication.context` (Repo has no context any more).
+- Mac screens (`desktop/`): `Session.kt` (screens + history, Back = Esc / ⌘[ / mouse back button / "‹" links),
+  `SignIn.kt` (server address + servers found on the network → "Who's watching?" → password; remembered sign-ins are
+  checked, password-less profiles go straight in), `Browse.kt` (top bar with draggable strip, profile menu: switch profile /
+  sign out / change server; Libraries as 16:9 tiles with title counts; a library as a poster grid, loaded 120 at a time,
+  sorted by name), `Controls.kt` (PrimaryButton, QuietButton, TextLink, Field, Avatar, HoverTile, `mouseTarget`).
+  Posters don't open anything yet (details page is phase 3). Menus: Go (Back ⌘[, Libraries ⇧⌘L), View (performance).
+- Coil 3 on the Mac (disk cache in ~/Library/Caches/app.blush.mac/images), slf4j-nop for the SDK.
+- Window dragging: the window is drawn under a see-through title bar, so `WindowDraggableArea` strips (28 dp along the
+  top, and the 56 dp top bar) are where it can be dragged. Untested whether macOS also drags natively there.
+- Screenshots now: desktop-server/profiles/password/libraries/library/menu.png, from invented names and titles.
+
 ### Build 240 → app 0.3.157 (Mac: instant button states, View → Show performance; TV unchanged)
 - Owner: the slowness is buttons reacting to the pointer/clicks. `HoverPill` now has no fades or press-dip animation (states
   snap, like Mac buttons). New `Perf.kt`: View → Show performance (⌥⌘P) overlay with click→drawn, pointer→drawn and draw time

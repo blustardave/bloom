@@ -32,6 +32,9 @@ object PointerProbe {
     val bounds = HashMap<String, Rect>()
 }
 
+/** Records where this control is drawn, under [name] (see [PointerProbe]). */
+fun Modifier.probe(name: String): Modifier = onGloballyPositioned { PointerProbe.bounds[name] = it.boundsInRoot() }
+
 /**
  * A small pill-shaped choice: quiet at rest, brighter under the pointer, brighter still while pressed, white when [selected].
  */

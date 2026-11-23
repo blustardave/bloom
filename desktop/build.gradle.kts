@@ -15,6 +15,11 @@ dependencies {
     runtimeOnly("org.jetbrains.compose.desktop:desktop-jvm-$desktopTarget:${libs.versions.compose.multiplatform.get()}")
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.coroutines.swing)
+    // Pictures (posters, profile pictures), the same library as the TV app.
+    implementation(libs.coil.compose)
+    implementation(libs.coil.network.okhttp)
+    // The Jellyfin SDK logs through SLF4J, which the app has to supply (as on the TV).
+    runtimeOnly(libs.slf4j.nop)
 }
 
 // Everything in one jar, started by Bloom.app's launcher with the bundled Java runtime.
