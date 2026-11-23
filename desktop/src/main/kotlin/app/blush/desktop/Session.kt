@@ -63,6 +63,9 @@ class Session(val scope: CoroutineScope) {
     /** What was last typed on the Search page (kept while browsing). */
     var lastSearch = ""
 
+    /** Search's random "Something to watch" titles, picked once per sign-in. */
+    var searchSuggestions by mutableStateOf(listOf<BaseItemDto>())
+
     /** A short message at the bottom of the window (e.g. for things not built yet on the Mac). */
     var toastText by mutableStateOf<String?>(null)
         private set
@@ -80,7 +83,7 @@ class Session(val scope: CoroutineScope) {
 
     /** Replaces the whole history with [next] (after signing in or out). */
     fun reset(next: Screen) {
-        if (next == Screen.Home && (screen == Screen.Profiles || screen is Screen.Password || screen == Screen.Server || screen == Screen.Starting)) home = HomeState()
+        if (next == Screen.Home && (screen == Screen.Profiles || screen is Screen.Password || screen == Screen.Server || screen == Screen.Starting)) { home = HomeState(); searchSuggestions = emptyList(); lastSearch = "" }
         history.clear(); screen = next
     }
 

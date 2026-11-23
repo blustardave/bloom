@@ -84,8 +84,8 @@ private val posters = listOf(
 @Composable
 private fun ShellLook(current: String = "Libraries", underBar: Boolean = false, content: @Composable () -> Unit) {
     Box(Modifier.fillMaxSize().background(Blush.colors.background)) {
-        Box(Modifier.fillMaxSize().padding(top = if (underBar) 0.dp else 64.dp)) { content() }
-        NavBar(current, emptyList(), "Alex", null, {}, {}, {}, {})
+        Box(Modifier.fillMaxSize().padding(top = if (underBar) 0.dp else BarHeight)) { content() }
+        NavBar(current, emptyList(), "Alex", null, current == "", {}, {}, {}, {}, {})
     }
 }
 
@@ -123,13 +123,13 @@ fun main(args: Array<String>) {
                     tab = DetailsTab.Similar
                 }
             }
-            DetailsScreen(state, Pictures.None, {}, {}, {}, {}, {}, {})
+            DetailsScreen(state, Pictures.None, {}, {}, {}, {}, {})
         }
     }.hover("tab-Details").save("desktop-details.png")
 
     Shot(out) {
         ShellLook("Search") {
-            SearchScreen("harbour", {}, posters.take(3).map { fakeItem(it.name, it.year ?: 2000, 100, emptyList()) }, false, emptyList(), Pictures.None) {}
+            SearchScreen("", {}, null, false, listOf("harbour", "ferry"), posters.take(14).map { fakeItem(it.name, it.year ?: 2000, 100, emptyList()) }, Pictures.None) {}
         }
     }.save("desktop-search.png")
 

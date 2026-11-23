@@ -125,6 +125,21 @@ Shared with the Mac app: `shared/src/commonMain/kotlin/app/blush/tv/` (same pack
 
 ## Change history (newest first)
 
+### Build 254 → Mac 0.3.171 (Mac: nav bar redesign, Back button, title page background, Search page; TV unchanged)
+- Owner's notes on 0.3.170, with a reference screenshot of another Jellyfin client's bar (flat dark pill, solid white
+  pill on the current page, logo left, search + avatar right). Owner asked me to choose the pill's behaviour for a Mac.
+- `NavBar.kt` rewritten: logo at left (below/clear of the traffic lights; bar is 80 dp, contents 12 dp lower), a round Back
+  button beside it when `session.canGoBack` (replaces the "‹ Back" / "‹ Libraries" links on pages), a flat pill
+  (#292A2F at 90%, 1 dp white-7% edge, shadow) whose current page is a solid white pill with dark text — slides (spring)
+  between pages, and appears in place (no slide from x=0) when coming from Search / a title page (the "weird behaviour").
+  Hover = faint white 8% under the name, immediately; no pointer-following highlight (lags with a mouse). Search circle +
+  profile at the right. `BarHeight` = 80 dp is the top padding of pages under the bar.
+- Title page: the backdrop is now fixed behind the page and the content scrolls over it; a blurred copy fades in (and the
+  page darkens) as you scroll (0 → 1 over 70% of the banner height), so no seam. More like this = `PosterColumns`
+  (6 columns sized to the window, first 12 → two rows); collections also 6 across.
+- Search: big rounded box (magnifier inside, no accent outline, lighter on hover/focus, Clear button), 7-column results,
+  and with nothing typed: recent-search pills + "Something to watch" (21 random films/series, once per sign-in).
+
 ### Build 252 → Mac 0.3.169 (Mac: TV-style pill navigation bar, Watchlist page, softer title-page edge; TV unchanged)
 - Owner: the title page's hard line between the sharp picture and the blurred lower part looked strange; asked for the
   TV's pill navigation bar next.

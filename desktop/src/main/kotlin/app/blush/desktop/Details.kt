@@ -20,6 +20,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -136,32 +138,46 @@ fun DetailsScreen(
     onSeason: (UUID) -> Unit,
     onFavourite: (Boolean) -> Unit,
     onPlayed: (Boolean) -> Unit,
-    onBack: () -> Unit,
 ) {
     val item = state.item
     val page = Blush.colors.background
+    val list = rememberLazyListState()
     BoxWithConstraints(Modifier.fillMaxSize().background(page)) {
-        val bannerHeight = (maxHeight * 0.72f).coerceIn(440.dp, 720.dp)
-        // Behind the tabs: the same picture, heavily blurred and darkened (the TV's blurred lower half).
-        if (item != null) pictures.backdrop(item)?.let { url ->
-            AsyncImage(url, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().blur(70.dp))
-            // Darker towards the left and the bottom, like the banner's own gradients, so text stays easy to read.
+        val bannerHeight = (maxHeight * 0.74f).coerceIn(440.dp, 720.dp)
+        val bannerPx = with(LocalDensity.current) { bannerHeight.toPx() }
+        // How far the page has scrolled past the banner (0 at the top, 1 once the tabs reach the top of the window).
+        val blurAmount = {
+            if (list.firstVisibleItemIndex > 0) 1f else (list.firstVisibleItemScrollOffset / (bannerPx * 0.7f)).coerceIn(0f, 1f)
+        }
+        // The picture stays still and the page scrolls over it; as you scroll down it turns blurred and darker (the blurred
+        // copy fades in over the sharp one), so there's never an edge between the two.
+        if (item != null) Box(Modifier.fillMaxSize()) {
+            val url = pictures.backdrop(item)
+            if (url != null) {
+                AsyncImage(url, null, contentScale = ContentScale.Crop, alignment = Alignment.TopCenter, modifier = Modifier.fillMaxSize())
+                AsyncImage(
+                    url, null, contentScale = ContentScale.Crop, alignment = Alignment.TopCenter,
+                    modifier = Modifier.fillMaxSize().graphicsLayer { alpha = blurAmount() }.blur(60.dp),
+                )
+            }
             Box(
-                Modifier.fillMaxSize().background(page.copy(alpha = 0.72f)).drawBehind {
-                    drawRect(Brush.horizontalGradient(0f to page.copy(alpha = 0.6f), 0.6f to Color.Transparent))
-                    drawRect(Brush.verticalGradient(0.5f to Color.Transparent, 1f to page.copy(alpha = 0.6f)))
+                Modifier.fillMaxSize().drawBehind {
+                    val t = blurAmount()
+                    drawRect(page.copy(alpha = 0.55f * t))
+                    drawRect(Brush.horizontalGradient(0f to page.copy(alpha = 0.95f), 0.42f to page.copy(alpha = 0.55f), 0.75f to Color.Transparent))
+                    drawRect(Brush.verticalGradient(0f to page.copy(alpha = 0.55f), 0.14f to Color.Transparent, 0.5f to Color.Transparent, 1f to page.copy(alpha = 0.92f)))
                 },
             )
         }
-        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 48.dp)) {
-            item(key = "banner") { DetailsBanner(state, pictures, bannerHeight, onPlay, onFavourite, onPlayed, onBack) }
+        LazyColumn(Modifier.fillMaxSize(), state = list, contentPadding = PaddingValues(bottom = 48.dp)) {
+            item(key = "banner") { DetailsBanner(state, pictures, bannerHeight, onPlay, onFavourite, onPlayed) }
             item(key = "tabs") { TabsRow(state) }
             item(key = "content") {
                 Box(Modifier.padding(horizontal = PageSide).padding(top = 22.dp)) {
                     when (state.tab) {
                         DetailsTab.Episodes -> EpisodesTab(state, pictures, onSeason, onPlay)
                         DetailsTab.Collection -> PosterGrid(state.children, pictures, onOpen)
-                        DetailsTab.Similar -> state.similar?.let { PosterGrid(it, pictures, onOpen) } ?: Note("Finding similar titles…")
+                        DetailsTab.Similar -> state.similar?.let { PosterGrid(it.take(12), pictures, onOpen) } ?: Note("Finding similar titles…")
                         DetailsTab.Extras -> ExtrasGrid(state.extras, pictures, onPlay)
                         DetailsTab.Info -> item?.let { InfoTab(it) }
                         null -> Unit
@@ -181,31 +197,9 @@ private fun DetailsBanner(
     onPlay: (BaseItemDto) -> Unit,
     onFavourite: (Boolean) -> Unit,
     onPlayed: (Boolean) -> Unit,
-    onBack: () -> Unit,
 ) {
     val item = state.item
-    val page = Blush.colors.background
     Box(Modifier.fillMaxWidth().height(height)) {
-        // The sharp picture melts away towards its bottom into the blurred copy behind the page (no hard edge).
-        Box(
-            Modifier.fillMaxSize()
-                .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-                .drawWithContent {
-                    drawContent()
-                    drawRect(Brush.verticalGradient(0.45f to Color.Black, 1f to Color.Transparent), blendMode = BlendMode.DstIn)
-                },
-        ) {
-            item?.let { pictures.backdrop(it) }?.let { url ->
-                AsyncImage(url, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-            }
-            Box(
-                Modifier.fillMaxSize().drawBehind {
-                    drawRect(Brush.horizontalGradient(0f to page.copy(alpha = 0.95f), 0.42f to page.copy(alpha = 0.55f), 0.75f to Color.Transparent))
-                    drawRect(Brush.verticalGradient(0f to page.copy(alpha = 0.55f), 0.16f to Color.Transparent))
-                },
-            )
-        }
-        TextLink("‹ Back", onBack, Modifier.align(Alignment.TopStart).padding(start = PageSide - 8.dp, top = 64.dp))
         if (item == null) return@Box
         Column(Modifier.align(Alignment.BottomStart).padding(start = PageSide, bottom = 36.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
             Column(Modifier.width(520.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -297,12 +291,11 @@ private fun TabsRow(state: DetailsState) {
     }
 }
 
+/** Posters six across, sized to fill the width of the window (More like this shows two rows of them). */
 @Composable
 private fun PosterGrid(items: List<BaseItemDto>, pictures: Pictures, onOpen: (BaseItemDto) -> Unit) {
     if (items.isEmpty()) { Note("Nothing here yet."); return }
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
-        items.forEach { PosterTile(it, pictures, showName = true) { onOpen(it) } }
-    }
+    PosterColumns(items, columns = 6, pictures = pictures, onOpen = onOpen)
 }
 
 @Composable
@@ -419,6 +412,5 @@ fun DetailsRoute(session: Session, id: UUID, preview: BaseItemDto?) {
             // setPlayed answers with the new watched state, so success is "it now matches what was asked".
             scope.launch { if (runCatching { repo.setPlayed(id, want) == want }.getOrDefault(false).not()) state.played = !want }
         },
-        onBack = session::back,
     )
 }

@@ -79,7 +79,7 @@ internal fun ProfileMenu(name: String, imageUrl: String?, onSwitchProfile: () ->
         if (open) {
             Popup(
                 alignment = Alignment.TopEnd,
-                offset = IntOffset(0, 96),
+                offset = IntOffset(0, 104),
                 onDismissRequest = { open = false },
                 properties = PopupProperties(focusable = true),
             ) {
@@ -118,12 +118,14 @@ fun Shell(session: Session, current: String, underBar: Boolean = false, content:
     val server = session.store.server
     val pins = remember(user?.userId, server?.id) { session.store.railPins(server?.id, user?.userId) }
     Box(Modifier.fillMaxSize().background(Blush.colors.background)) {
-        Box(Modifier.fillMaxSize().padding(top = if (underBar) 0.dp else 64.dp)) { content() }
+        Box(Modifier.fillMaxSize().padding(top = if (underBar) 0.dp else BarHeight)) { content() }
         NavBar(
             current = current,
             pins = pins.map { "pin-${it.libraryId}" to it.name },
             userName = user?.name ?: "",
             userImage = user?.let { session.repo.userImageUrl(it.userId, it.imageTag) },
+            canGoBack = session.canGoBack,
+            onBack = session::back,
             onPick = { key ->
                 when (key) {
                     "Home" -> session.reset(Screen.Home)
@@ -219,9 +221,6 @@ fun LibraryScreen(title: String, total: Int?, posters: List<PosterCard>, error: 
     }
     Column(Modifier.fillMaxSize().padding(horizontal = PageSide)) {
         Spacer(Modifier.height(8.dp))
-        if (onBack != null) Row(verticalAlignment = Alignment.CenterVertically) {
-            TextLink("‹ Libraries", onBack, Modifier.offset(x = (-8).dp))
-        }
         Spacer(Modifier.height(4.dp))
         Row(verticalAlignment = Alignment.Bottom) {
             Text(title, style = DesktopType.headline)

@@ -450,8 +450,8 @@ private fun RowArrow(icon: androidx.compose.ui.graphics.vector.ImageVector, modi
 }
 
 @Composable
-internal fun PosterTile(item: BaseItemDto, pictures: Pictures, showName: Boolean = false, onClick: () -> Unit) {
-    Column(Modifier.width(PosterWidth), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+internal fun PosterTile(item: BaseItemDto, pictures: Pictures, showName: Boolean = false, width: Dp = PosterWidth, onClick: () -> Unit) {
+    Column(Modifier.width(width), verticalArrangement = Arrangement.spacedBy(7.dp)) {
         HoverTile(onClick, Modifier.fillMaxWidth().aspectRatio(2f / 3f).probe("tile-${item.name}"), corner = 8.dp, background = item.posterTint() ?: tintFor(item.name.orEmpty()).copy(alpha = 0.5f)) {
             val url = pictures.poster(item)
             if (url != null) AsyncImage(url, contentDescription = item.name, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
@@ -507,4 +507,20 @@ fun HomeRoute(session: Session) {
             }
         },
     )
+}
+
+/** Posters in [columns] equal columns that together fill the available width (they grow and shrink with the window). */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+fun PosterColumns(items: List<BaseItemDto>, columns: Int, pictures: Pictures, gap: Dp = 18.dp, onOpen: (BaseItemDto) -> Unit) {
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val w = (maxWidth - gap * (columns - 1)) / columns
+        androidx.compose.foundation.layout.FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(gap),
+            verticalArrangement = Arrangement.spacedBy(22.dp),
+            maxItemsInEachRow = columns,
+        ) {
+            items.forEach { PosterTile(it, pictures, showName = true, width = w) { onOpen(it) } }
+        }
+    }
 }
