@@ -244,7 +244,7 @@ fun HomeScreen(
 ) {
     val list = rememberLazyListState()
     BoxWithConstraints(Modifier.fillMaxSize().background(Blush.colors.background)) {
-        val bannerHeight = (maxHeight * 0.80f).coerceIn(440.dp, 760.dp)
+        val bannerHeight = (maxHeight * 0.74f).coerceIn(440.dp, 720.dp)
         LazyColumn(state = list, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 40.dp)) {
             item(key = "banner") {
                 Banner(home, pictures, bannerHeight, onOpen, onPlay, onToggleList)
@@ -468,7 +468,7 @@ private fun PosterTile(item: BaseItemDto, pictures: Pictures, onClick: () -> Uni
 @Composable
 private fun WideCard(item: BaseItemDto, pictures: Pictures, onClick: () -> Unit) {
     Column(Modifier.width(CardWidth), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-        HoverTile(onClick, Modifier.fillMaxWidth().aspectRatio(16f / 9f), corner = 10.dp, background = tintFor(item.seriesName ?: item.name.orEmpty()).copy(alpha = 0.5f)) {
+        HoverTile(onClick, Modifier.fillMaxWidth().aspectRatio(16f / 9f).probe("card-${item.name}"), corner = 10.dp, background = tintFor(item.seriesName ?: item.name.orEmpty()).copy(alpha = 0.5f)) {
             val url = pictures.thumb(item)
             if (url != null) AsyncImage(url, contentDescription = item.name, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
             ProgressBar(item.progress())

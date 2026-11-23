@@ -116,7 +116,7 @@ fun main(args: Array<String>) {
     val out = File(args.firstOrNull() ?: "build/shots").apply { mkdirs() }
 
     Shot(out) { ShellLook("Home", underBar = true) { HomeScreen(androidx.compose.runtime.remember { fakeHome() }, Pictures.None, {}, {}, { _, _ -> }) } }
-        .hover("tile-Northern Static").save("desktop-home.png")
+        .hover("card-Northern Static").save("desktop-home.png")
 
     Shot(out) {
         ServerScreen(
