@@ -164,8 +164,9 @@ private fun Screens(session: Session) {
         is Screen.Password -> key(s) { PasswordRoute(session, s.profile) }
         Screen.Home -> Shell(session, "Home", underBar = true) { HomeRoute(session) }
         Screen.Libraries -> Shell(session, "Libraries") { LibrariesRoute(session) }
-        is Screen.Library -> Shell(session, "Libraries") { key(s.library.id) { LibraryRoute(session, s.library) } }
+        is Screen.Library -> Shell(session, if (session.store.railPins(session.store.server?.id, session.repo.currentUser?.userId).any { it.libraryId == s.library.id.toString() }) "pin-${s.library.id}" else "Libraries") { key(s.library.id) { LibraryRoute(session, s.library) } }
         is Screen.Details -> Shell(session, "", underBar = true) { key(s.id) { DetailsRoute(session, s.id, s.preview) } }
         Screen.Search -> Shell(session, "Search") { SearchRoute(session) }
+        Screen.Watchlist -> Shell(session, "Watchlist") { WatchlistRoute(session) }
     }
 }

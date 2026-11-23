@@ -33,6 +33,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -140,8 +144,14 @@ fun DetailsScreen(
         val bannerHeight = (maxHeight * 0.72f).coerceIn(440.dp, 720.dp)
         // Behind the tabs: the same picture, heavily blurred and darkened (the TV's blurred lower half).
         if (item != null) pictures.backdrop(item)?.let { url ->
-            AsyncImage(url, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().blur(60.dp))
-            Box(Modifier.fillMaxSize().background(page.copy(alpha = 0.78f)))
+            AsyncImage(url, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().blur(70.dp))
+            // Darker towards the left and the bottom, like the banner's own gradients, so text stays easy to read.
+            Box(
+                Modifier.fillMaxSize().background(page.copy(alpha = 0.72f)).drawBehind {
+                    drawRect(Brush.horizontalGradient(0f to page.copy(alpha = 0.6f), 0.6f to Color.Transparent))
+                    drawRect(Brush.verticalGradient(0.5f to Color.Transparent, 1f to page.copy(alpha = 0.6f)))
+                },
+            )
         }
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 48.dp)) {
             item(key = "banner") { DetailsBanner(state, pictures, bannerHeight, onPlay, onFavourite, onPlayed, onBack) }
@@ -176,15 +186,25 @@ private fun DetailsBanner(
     val item = state.item
     val page = Blush.colors.background
     Box(Modifier.fillMaxWidth().height(height)) {
-        item?.let { pictures.backdrop(it) }?.let { url ->
-            AsyncImage(url, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-        }
+        // The sharp picture melts away towards its bottom into the blurred copy behind the page (no hard edge).
         Box(
-            Modifier.fillMaxSize().drawBehind {
-                drawRect(Brush.horizontalGradient(0f to page.copy(alpha = 0.95f), 0.42f to page.copy(alpha = 0.55f), 0.75f to Color.Transparent))
-                drawRect(Brush.verticalGradient(0f to page.copy(alpha = 0.55f), 0.16f to Color.Transparent, 0.55f to Color.Transparent, 1f to page.copy(alpha = 0.0f)))
-            },
-        )
+            Modifier.fillMaxSize()
+                .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                .drawWithContent {
+                    drawContent()
+                    drawRect(Brush.verticalGradient(0.45f to Color.Black, 1f to Color.Transparent), blendMode = BlendMode.DstIn)
+                },
+        ) {
+            item?.let { pictures.backdrop(it) }?.let { url ->
+                AsyncImage(url, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+            }
+            Box(
+                Modifier.fillMaxSize().drawBehind {
+                    drawRect(Brush.horizontalGradient(0f to page.copy(alpha = 0.95f), 0.42f to page.copy(alpha = 0.55f), 0.75f to Color.Transparent))
+                    drawRect(Brush.verticalGradient(0f to page.copy(alpha = 0.55f), 0.16f to Color.Transparent))
+                },
+            )
+        }
         TextLink("‹ Back", onBack, Modifier.align(Alignment.TopStart).padding(start = PageSide - 8.dp, top = 64.dp))
         if (item == null) return@Box
         Column(Modifier.align(Alignment.BottomStart).padding(start = PageSide, bottom = 36.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {

@@ -125,6 +125,18 @@ Shared with the Mac app: `shared/src/commonMain/kotlin/app/blush/tv/` (same pack
 
 ## Change history (newest first)
 
+### Build 252 → Mac 0.3.169 (Mac: TV-style pill navigation bar, Watchlist page, softer title-page edge; TV unchanged)
+- Owner: the title page's hard line between the sharp picture and the blurred lower part looked strange; asked for the
+  TV's pill navigation bar next.
+- `NavBar.kt`: Search circle (left, after the traffic lights), centred pill with Home / pinned libraries (Store.railPins
+  for this server + profile; the Mac has none until pinning exists there) / Libraries / Watchlist, profile circle (right,
+  opens the menu). The highlight rests dimmed (22%) on the current page and, while the pointer is in the pill, slides
+  (spring) to the hovered name and turns white with dark text; the pill grows 0.96 → 1 under the pointer. Dark #1E1F25
+  pill and circles with the TV's top highlight and shadow. Wordmark and old tabs removed. Pages under the bar start at 64 dp.
+- `WatchlistRoute` (favourites, films + series, newest first, up to 300) reuses LibraryScreen (no back link).
+- Title page: the sharp backdrop is masked (Offscreen + DstIn gradient from 45%) so it melts into the blurred copy, which
+  is darker at the left and bottom. Screenshot `desktop-nav.png` shows the pill with the pointer on Libraries.
+
 ### Build 251 → Mac 0.3.168 (Mac: title pages, Search; fixed performance timing; TV unchanged)
 - Owner's overlay on 0.3.167 Home showed ~250–300 ms click/pointer→drawn with 0.3 ms drawing: mostly a measuring fault
   (tiles draw in their own layers, so the root only redrew on the next unrelated change) and probably the first, AOT

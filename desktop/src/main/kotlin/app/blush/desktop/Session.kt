@@ -30,6 +30,7 @@ sealed interface Screen {
     /** A title's page; [preview] is what was already known about it (shown while the rest loads). */
     data class Details(val id: java.util.UUID, val preview: BaseItemDto? = null) : Screen
     data object Search : Screen
+    data object Watchlist : Screen
 }
 
 /** One person on "Who's watching?". [saved] is set when this Mac already holds their sign-in. */

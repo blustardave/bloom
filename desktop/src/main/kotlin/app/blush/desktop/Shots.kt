@@ -84,8 +84,8 @@ private val posters = listOf(
 @Composable
 private fun ShellLook(current: String = "Libraries", underBar: Boolean = false, content: @Composable () -> Unit) {
     Box(Modifier.fillMaxSize().background(Blush.colors.background)) {
-        Box(Modifier.fillMaxSize().padding(top = if (underBar) 0.dp else 56.dp)) { content() }
-        TopBar(current, "Alex", null, {}, {}, {}, {}, {}, {})
+        Box(Modifier.fillMaxSize().padding(top = if (underBar) 0.dp else 64.dp)) { content() }
+        NavBar(current, emptyList(), "Alex", null, {}, {}, {}, {})
     }
 }
 

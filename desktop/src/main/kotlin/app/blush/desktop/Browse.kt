@@ -65,66 +65,21 @@ data class LibraryCard(val name: String, val imageUrl: String?, val count: Int?)
 /** One title in a library grid. */
 data class PosterCard(val name: String, val year: Int?, val imageUrl: String?, val tint: Color?)
 
-// ---------- Top bar ----------
-
-@Composable
-fun TopBar(current: String, userName: String, userImage: String?, onHome: () -> Unit, onLibraries: () -> Unit, onSearch: () -> Unit, onSwitchProfile: () -> Unit, onSignOut: () -> Unit, onChangeServer: () -> Unit) {
-    Box(
-        Modifier.fillMaxWidth().height(64.dp)
-            // A soft shade from the top, so the tabs stay readable over the banner's artwork.
-            .background(Brush.verticalGradient(0f to Blush.colors.background.copy(alpha = 0.75f), 1f to Color.Transparent)),
-    ) {
-        LocalDragArea.current(Modifier.fillMaxSize())
-        Row(Modifier.fillMaxSize().padding(start = TrafficLights, end = PageSide - 2.dp), verticalAlignment = Alignment.CenterVertically) {
-            val mark = remember { resourceImage("bloom_wordmark.png") }
-            Image(mark, contentDescription = "Bloom", modifier = Modifier.height(20.dp).aspectRatio(430f / 112f))
-            Spacer(Modifier.width(28.dp))
-            TopTab("Home", selected = current == "Home", onClick = onHome)
-            Spacer(Modifier.width(14.dp))
-            TopTab("Libraries", selected = current == "Libraries", onClick = onLibraries)
-            Spacer(Modifier.weight(1f))
-            SearchButton(current == "Search", onSearch)
-            Spacer(Modifier.width(12.dp))
-            ProfileMenu(userName, userImage, onSwitchProfile, onSignOut, onChangeServer)
-        }
-    }
-}
-
-/** The magnifying glass at the top right (⌘F also opens Search). */
-@Composable
-private fun SearchButton(selected: Boolean, onClick: () -> Unit) {
-    val h = rememberHover()
-    Box(
-        Modifier.size(34.dp).clip(RoundedCornerShape(50))
-            .background(if (h.lit || selected) Color.White.copy(alpha = if (selected) 0.22f else 0.14f) else Color.Transparent)
-            .mouseTarget(h, onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) { app.blush.tv.ui.components.Icon(app.blush.tv.ui.components.Icons.Search, "Search", if (h.lit || selected) Color.White else Blush.colors.textSoft, size = 18.dp) }
-}
-
-@Composable
-private fun TopTab(text: String, selected: Boolean, onClick: () -> Unit) {
-    val h = rememberHover()
-    Column(Modifier.mouseTarget(h, onClick = onClick).padding(horizontal = 6.dp, vertical = 6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(text, style = DesktopType.label, color = if (selected || h.lit) Color.White else Blush.colors.textMuted)
-        Spacer(Modifier.height(4.dp))
-        Box(Modifier.width(18.dp).height(2.dp).clip(RoundedCornerShape(1.dp)).background(if (selected) Blush.colors.accent.color else Color.Transparent))
-    }
-}
+// ---------- Top bar: see NavBar.kt ----------
 
 /** The profile picture at the top right; a click opens a small menu (a click anywhere else closes it). */
 @Composable
-private fun ProfileMenu(name: String, imageUrl: String?, onSwitchProfile: () -> Unit, onSignOut: () -> Unit, onChangeServer: () -> Unit) {
+internal fun ProfileMenu(name: String, imageUrl: String?, onSwitchProfile: () -> Unit, onSignOut: () -> Unit, onChangeServer: () -> Unit) {
     var open by remember { mutableStateOf(false) }
     val h = rememberHover()
     Box {
-        Box(Modifier.size(34.dp).probe("profile-menu").clip(RoundedCornerShape(50)).mouseTarget(h) { open = !open }, contentAlignment = Alignment.Center) {
-            Avatar(name, imageUrl, if (h.lit || open) 34.dp else 30.dp)
+        Box(Modifier.probe("profile-menu").mouseTarget(h) { open = !open }) {
+            ProfileCircle(name, imageUrl, h.lit || open)
         }
         if (open) {
             Popup(
                 alignment = Alignment.TopEnd,
-                offset = IntOffset(0, 90),
+                offset = IntOffset(0, 96),
                 onDismissRequest = { open = false },
                 properties = PopupProperties(focusable = true),
             ) {
@@ -154,21 +109,34 @@ private fun MenuRow(text: String, onClick: () -> Unit) {
 }
 
 /**
- * Everything after sign-in: the top bar over the current page. [underBar] pages (Home) run up behind the bar; the
- * rest start below it.
+ * Everything after sign-in: the navigation bar over the current page. [underBar] pages (Home, title pages) run up
+ * behind the bar; the rest start below it.
  */
 @Composable
 fun Shell(session: Session, current: String, underBar: Boolean = false, content: @Composable () -> Unit) {
     val user = session.repo.currentUser
+    val server = session.store.server
+    val pins = remember(user?.userId, server?.id) { session.store.railPins(server?.id, user?.userId) }
     Box(Modifier.fillMaxSize().background(Blush.colors.background)) {
-        Box(Modifier.fillMaxSize().padding(top = if (underBar) 0.dp else 56.dp)) { content() }
-        TopBar(
+        Box(Modifier.fillMaxSize().padding(top = if (underBar) 0.dp else 64.dp)) { content() }
+        NavBar(
             current = current,
+            pins = pins.map { "pin-${it.libraryId}" to it.name },
             userName = user?.name ?: "",
             userImage = user?.let { session.repo.userImageUrl(it.userId, it.imageTag) },
-            onHome = { session.reset(Screen.Home) },
-            onLibraries = { session.reset(Screen.Libraries) },
-            onSearch = { if (session.screen != Screen.Search) session.go(Screen.Search) },
+            onPick = { key ->
+                when (key) {
+                    "Home" -> session.reset(Screen.Home)
+                    "Libraries" -> session.reset(Screen.Libraries)
+                    "Watchlist" -> session.reset(Screen.Watchlist)
+                    "Search" -> if (session.screen != Screen.Search) session.go(Screen.Search)
+                    else -> if (key.startsWith("pin-")) session.launch {
+                        val id = key.removePrefix("pin-")
+                        runCatching { session.repo.libraries() }.getOrDefault(emptyList()).firstOrNull { it.id.toString() == id }
+                            ?.let { session.reset(Screen.Library(it)) }
+                    }
+                }
+            },
             onSwitchProfile = session::switchProfile,
             onSignOut = session::signOut,
             onChangeServer = session::changeServer,
@@ -242,7 +210,7 @@ fun LibrariesRoute(session: Session) {
 // ---------- One library ----------
 
 @Composable
-fun LibraryScreen(title: String, total: Int?, posters: List<PosterCard>, error: String?, onBack: () -> Unit, onNearEnd: () -> Unit, onOpen: (Int) -> Unit = {}) {
+fun LibraryScreen(title: String, total: Int?, posters: List<PosterCard>, error: String?, onBack: (() -> Unit)?, onNearEnd: () -> Unit, onOpen: (Int) -> Unit = {}) {
     val grid = rememberLazyGridState()
     LaunchedEffect(grid, posters.size) {
         snapshotFlow { grid.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0 }.collect { last ->
@@ -251,7 +219,7 @@ fun LibraryScreen(title: String, total: Int?, posters: List<PosterCard>, error: 
     }
     Column(Modifier.fillMaxSize().padding(horizontal = PageSide)) {
         Spacer(Modifier.height(8.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        if (onBack != null) Row(verticalAlignment = Alignment.CenterVertically) {
             TextLink("‹ Libraries", onBack, Modifier.offset(x = (-8).dp))
         }
         Spacer(Modifier.height(4.dp))
@@ -308,4 +276,26 @@ fun LibraryRoute(session: Session, library: BaseItemDto) {
     LaunchedEffect(library.id) { more() }
     val posters = remember(items) { items.map { PosterCard(it.name ?: "", it.productionYear, repo.posterUrl(it), it.posterTint()) } }
     LibraryScreen(library.name ?: "Library", total, posters, error, onBack = session::back, onNearEnd = ::more, onOpen = { i -> items.getOrNull(i)?.let { session.go(Screen.Details(it.id, it)) } })
+}
+
+/** The Watchlist page: everything on your watchlist (Jellyfin's favourites), newest first. */
+@Composable
+fun WatchlistRoute(session: Session) {
+    val repo = session.repo
+    var items by remember { mutableStateOf(listOf<BaseItemDto>()) }
+    var total by remember { mutableStateOf<Int?>(null) }
+    var error by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(Unit) {
+        runCatching {
+            repo.browsePage(
+                types = listOf(org.jellyfin.sdk.model.api.BaseItemKind.MOVIE, org.jellyfin.sdk.model.api.BaseItemKind.SERIES),
+                favouritesOnly = true, sortBy = ItemSortBy.DATE_CREATED, descending = true, limit = 300,
+            )
+        }.onSuccess { (page, count) -> items = page; total = count }.onFailure { error = "Couldn't load your watchlist." }
+    }
+    val posters = remember(items) { items.map { PosterCard(it.name ?: "", it.productionYear, repo.posterUrl(it), it.posterTint()) } }
+    LibraryScreen(
+        "Watchlist", total, posters, error ?: if (total == 0) "Nothing on your watchlist yet: the + on a title adds it." else null,
+        onBack = null, onNearEnd = {}, onOpen = { i -> items.getOrNull(i)?.let { session.go(Screen.Details(it.id, it)) } },
+    )
 }
