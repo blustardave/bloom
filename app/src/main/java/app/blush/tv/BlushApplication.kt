@@ -21,8 +21,15 @@ class BlushApplication : Application(), SingletonImageLoader.Factory {
     lateinit var repo: Repo
         private set
 
+    companion object {
+        /** The app itself, for the few Android calls made from shared code paths (e.g. the playback profile). */
+        lateinit var context: android.content.Context
+            private set
+    }
+
     override fun onCreate() {
         super.onCreate()
+        context = this
         CrashLog.install(this)
         // The server code is shared with the Mac app; only the SDK set-up, device name and settings file are Android's own.
         val device = androidDevice(this)

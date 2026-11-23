@@ -1,5 +1,6 @@
 package app.blush.tv.playback
 
+import app.blush.tv.BlushApplication
 import android.content.Context
 import android.media.AudioFormat
 import android.media.AudioManager
@@ -294,7 +295,7 @@ suspend fun Repo.preparePlayback(
             startTimeTicks = startTicks,
             audioStreamIndex = audioIndex,
             subtitleStreamIndex = subtitleIndex,
-            deviceProfile = DeviceCapabilities.profile(appContext, bitrate, forPreview),
+            deviceProfile = DeviceCapabilities.profile(BlushApplication.context, bitrate, forPreview),
             enableDirectPlay = !forceTranscode,
             enableDirectStream = !forceTranscode,
             enableTranscoding = true,
