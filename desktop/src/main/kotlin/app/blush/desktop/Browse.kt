@@ -68,7 +68,7 @@ data class PosterCard(val name: String, val year: Int?, val imageUrl: String?, v
 // ---------- Top bar ----------
 
 @Composable
-fun TopBar(current: String, userName: String, userImage: String?, onHome: () -> Unit, onLibraries: () -> Unit, onSwitchProfile: () -> Unit, onSignOut: () -> Unit, onChangeServer: () -> Unit) {
+fun TopBar(current: String, userName: String, userImage: String?, onHome: () -> Unit, onLibraries: () -> Unit, onSearch: () -> Unit, onSwitchProfile: () -> Unit, onSignOut: () -> Unit, onChangeServer: () -> Unit) {
     Box(
         Modifier.fillMaxWidth().height(64.dp)
             // A soft shade from the top, so the tabs stay readable over the banner's artwork.
@@ -83,9 +83,23 @@ fun TopBar(current: String, userName: String, userImage: String?, onHome: () -> 
             Spacer(Modifier.width(14.dp))
             TopTab("Libraries", selected = current == "Libraries", onClick = onLibraries)
             Spacer(Modifier.weight(1f))
+            SearchButton(current == "Search", onSearch)
+            Spacer(Modifier.width(12.dp))
             ProfileMenu(userName, userImage, onSwitchProfile, onSignOut, onChangeServer)
         }
     }
+}
+
+/** The magnifying glass at the top right (⌘F also opens Search). */
+@Composable
+private fun SearchButton(selected: Boolean, onClick: () -> Unit) {
+    val h = rememberHover()
+    Box(
+        Modifier.size(34.dp).clip(RoundedCornerShape(50))
+            .background(if (h.lit || selected) Color.White.copy(alpha = if (selected) 0.22f else 0.14f) else Color.Transparent)
+            .mouseTarget(h, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) { app.blush.tv.ui.components.Icon(app.blush.tv.ui.components.Icons.Search, "Search", if (h.lit || selected) Color.White else Blush.colors.textSoft, size = 18.dp) }
 }
 
 @Composable
@@ -154,6 +168,7 @@ fun Shell(session: Session, current: String, underBar: Boolean = false, content:
             userImage = user?.let { session.repo.userImageUrl(it.userId, it.imageTag) },
             onHome = { session.reset(Screen.Home) },
             onLibraries = { session.reset(Screen.Libraries) },
+            onSearch = { if (session.screen != Screen.Search) session.go(Screen.Search) },
             onSwitchProfile = session::switchProfile,
             onSignOut = session::signOut,
             onChangeServer = session::changeServer,
@@ -227,7 +242,7 @@ fun LibrariesRoute(session: Session) {
 // ---------- One library ----------
 
 @Composable
-fun LibraryScreen(title: String, total: Int?, posters: List<PosterCard>, error: String?, onBack: () -> Unit, onNearEnd: () -> Unit, onOpen: () -> Unit = {}) {
+fun LibraryScreen(title: String, total: Int?, posters: List<PosterCard>, error: String?, onBack: () -> Unit, onNearEnd: () -> Unit, onOpen: (Int) -> Unit = {}) {
     val grid = rememberLazyGridState()
     LaunchedEffect(grid, posters.size) {
         snapshotFlow { grid.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0 }.collect { last ->
@@ -254,7 +269,7 @@ fun LibraryScreen(title: String, total: Int?, posters: List<PosterCard>, error: 
             verticalArrangement = Arrangement.spacedBy(20.dp),
             contentPadding = PaddingValues(top = 4.dp, bottom = 40.dp),
         ) {
-            itemsIndexed(posters) { _, p -> Poster(p, onOpen) }
+            itemsIndexed(posters) { i, p -> Poster(p) { onOpen(i) } }
         }
     }
 }
@@ -292,5 +307,5 @@ fun LibraryRoute(session: Session, library: BaseItemDto) {
     }
     LaunchedEffect(library.id) { more() }
     val posters = remember(items) { items.map { PosterCard(it.name ?: "", it.productionYear, repo.posterUrl(it), it.posterTint()) } }
-    LibraryScreen(library.name ?: "Library", total, posters, error, onBack = session::back, onNearEnd = ::more, onOpen = { session.toast(ComingSoon) })
+    LibraryScreen(library.name ?: "Library", total, posters, error, onBack = session::back, onNearEnd = ::more, onOpen = { i -> items.getOrNull(i)?.let { session.go(Screen.Details(it.id, it)) } })
 }

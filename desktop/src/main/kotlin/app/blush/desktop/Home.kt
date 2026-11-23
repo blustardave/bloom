@@ -231,9 +231,6 @@ class HomeState {
 
 // ---------- Screen ----------
 
-/** Shown when something isn't built yet on the Mac (title pages, playback). */
-const val ComingSoon = "Title pages and playback come in the next Mac builds."
-
 @Composable
 fun HomeScreen(
     home: HomeState,
@@ -344,7 +341,7 @@ fun BannerInfo(item: BaseItemDto, pictures: Pictures) {
 
 /** The banner's Play: see-through white at rest, solid white under the pointer (the TV's focused look). */
 @Composable
-private fun PlayPill(label: String, progress: Float?, onClick: () -> Unit) {
+internal fun PlayPill(label: String, progress: Float?, onClick: () -> Unit) {
     val h = rememberHover()
     val ink = Color(0xFF14151B)
     val lit = h.lit
@@ -453,13 +450,17 @@ private fun RowArrow(icon: androidx.compose.ui.graphics.vector.ImageVector, modi
 }
 
 @Composable
-private fun PosterTile(item: BaseItemDto, pictures: Pictures, onClick: () -> Unit) {
-    Column(Modifier.width(PosterWidth)) {
+internal fun PosterTile(item: BaseItemDto, pictures: Pictures, showName: Boolean = false, onClick: () -> Unit) {
+    Column(Modifier.width(PosterWidth), verticalArrangement = Arrangement.spacedBy(7.dp)) {
         HoverTile(onClick, Modifier.fillMaxWidth().aspectRatio(2f / 3f).probe("tile-${item.name}"), corner = 8.dp, background = item.posterTint() ?: tintFor(item.name.orEmpty()).copy(alpha = 0.5f)) {
             val url = pictures.poster(item)
             if (url != null) AsyncImage(url, contentDescription = item.name, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
             else Text(item.name.orEmpty(), Modifier.align(Alignment.Center).padding(10.dp), style = DesktopType.label, color = Blush.colors.textSoft)
             ProgressBar(item.progress())
+        }
+        if (showName) Column {
+            Text(item.name.orEmpty(), style = DesktopType.label, maxLines = 1)
+            Text(item.productionYear?.toString() ?: " ", style = DesktopType.caption, color = Blush.colors.textDim)
         }
     }
 }
@@ -496,8 +497,8 @@ fun HomeRoute(session: Session) {
     HomeScreen(
         home,
         session.repo.pictures(),
-        onOpen = { session.toast(ComingSoon) },
-        onPlay = { session.toast(ComingSoon) },
+        onOpen = { session.go(Screen.Details(it.id, it)) },
+        onPlay = { session.toast("Playback comes in the next Mac builds.") },
         onToggleList = { item, want ->
             home.listed[item.id] = want
             scope.launch {

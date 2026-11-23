@@ -29,6 +29,9 @@ import kotlinx.coroutines.delay
 object Perf {
     var shown by mutableStateOf(false)
 
+    /** Bumped on each click / pointer change while the panel is shown, so the window's root redraws in that same frame and
+     *  the timing sees it (tiles draw in their own layers, which the root doesn't otherwise notice). */
+    internal var tick by mutableStateOf(0)
     internal var pressAt = 0L
     internal var moveAt = 0L
     internal var over: String? = null
@@ -65,18 +68,19 @@ fun Modifier.perfMeasured(): Modifier = this
             while (true) {
                 val e = awaitPointerEvent(PointerEventPass.Initial)
                 when (e.type) {
-                    PointerEventType.Press -> Perf.pressAt = System.nanoTime()
+                    PointerEventType.Press -> { Perf.pressAt = System.nanoTime(); if (Perf.shown) Perf.tick++ }
                     PointerEventType.Move, PointerEventType.Enter, PointerEventType.Exit -> {
                         // Only moves that change which control is under the pointer change the picture.
                         val pos = e.changes.first().position
                         val over = PointerProbe.bounds.entries.firstOrNull { it.value.contains(pos) }?.key
-                        if (over != Perf.over) { Perf.over = over; if (Perf.moveAt == 0L) Perf.moveAt = System.nanoTime() }
+                        if (over != Perf.over) { Perf.over = over; if (Perf.moveAt == 0L) Perf.moveAt = System.nanoTime(); if (Perf.shown) Perf.tick++ }
                     }
                 }
             }
         }
     }
     .drawWithContent {
+        Perf.tick // read, so a bump redraws this
         val t = System.nanoTime()
         drawContent()
         val now = System.nanoTime()

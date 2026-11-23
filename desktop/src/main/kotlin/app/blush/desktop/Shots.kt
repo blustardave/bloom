@@ -85,7 +85,7 @@ private val posters = listOf(
 private fun ShellLook(current: String = "Libraries", underBar: Boolean = false, content: @Composable () -> Unit) {
     Box(Modifier.fillMaxSize().background(Blush.colors.background)) {
         Box(Modifier.fillMaxSize().padding(top = if (underBar) 0.dp else 56.dp)) { content() }
-        TopBar(current, "Alex", null, {}, {}, {}, {}, {})
+        TopBar(current, "Alex", null, {}, {}, {}, {}, {}, {})
     }
 }
 
@@ -114,6 +114,24 @@ private fun fakeHome() = HomeState().apply {
 
 fun main(args: Array<String>) {
     val out = File(args.firstOrNull() ?: "build/shots").apply { mkdirs() }
+
+    Shot(out) {
+        ShellLook("", underBar = true) {
+            val state = androidx.compose.runtime.remember {
+                DetailsState(fakeHome().featured.first()).apply {
+                    similar = posters.map { fakeItem(it.name, it.year ?: 2000, 100, emptyList()) }
+                    tab = DetailsTab.Similar
+                }
+            }
+            DetailsScreen(state, Pictures.None, {}, {}, {}, {}, {}, {})
+        }
+    }.hover("tab-Details").save("desktop-details.png")
+
+    Shot(out) {
+        ShellLook("Search") {
+            SearchScreen("harbour", {}, posters.take(3).map { fakeItem(it.name, it.year ?: 2000, 100, emptyList()) }, false, emptyList(), Pictures.None) {}
+        }
+    }.save("desktop-search.png")
 
     Shot(out) { ShellLook("Home", underBar = true) { HomeScreen(androidx.compose.runtime.remember { fakeHome() }, Pictures.None, {}, {}, { _, _ -> }) } }
         .hover("card-Northern Static").save("desktop-home.png")

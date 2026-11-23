@@ -97,6 +97,9 @@ fun main() {
                     Item("Home", shortcut = KeyShortcut(Key.H, meta = true, shift = true), enabled = session.repo.currentUser != null) {
                         session.reset(Screen.Home)
                     }
+                    Item("Search", shortcut = KeyShortcut(Key.F, meta = true), enabled = session.repo.currentUser != null) {
+                        if (session.screen != Screen.Search) session.go(Screen.Search)
+                    }
                     Item("Libraries", shortcut = KeyShortcut(Key.L, meta = true, shift = true), enabled = session.repo.currentUser != null) {
                         session.reset(Screen.Libraries)
                     }
@@ -162,5 +165,7 @@ private fun Screens(session: Session) {
         Screen.Home -> Shell(session, "Home", underBar = true) { HomeRoute(session) }
         Screen.Libraries -> Shell(session, "Libraries") { LibrariesRoute(session) }
         is Screen.Library -> Shell(session, "Libraries") { key(s.library.id) { LibraryRoute(session, s.library) } }
+        is Screen.Details -> Shell(session, "", underBar = true) { key(s.id) { DetailsRoute(session, s.id, s.preview) } }
+        Screen.Search -> Shell(session, "Search") { SearchRoute(session) }
     }
 }

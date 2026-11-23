@@ -125,6 +125,21 @@ Shared with the Mac app: `shared/src/commonMain/kotlin/app/blush/tv/` (same pack
 
 ## Change history (newest first)
 
+### Build 251 → Mac 0.3.168 (Mac: title pages, Search; fixed performance timing; TV unchanged)
+- Owner's overlay on 0.3.167 Home showed ~250–300 ms click/pointer→drawn with 0.3 ms drawing: mostly a measuring fault
+  (tiles draw in their own layers, so the root only redrew on the next unrelated change) and probably the first, AOT
+  "recording" launch. `Perf.tick` now forces a root redraw on each click / pointer change while the panel is shown.
+  Asked for a re-measure on a second launch.
+- `Details.kt`: the TV details page on the Mac — banner (backdrop, gradients, logo/name or SERIES kicker + episode name,
+  year • length/seasons • 3 genres • score + age badge, 4-line overview), Play/Resume (series: next episode's code) →
+  toast until playback exists, watchlist +/✓, watched eye (setPlayed returns the new state, compared to the request),
+  restart when part-watched; tabs Episodes (season pills, episode rows with still/progress/UP NEXT) / In this collection /
+  More like this / Extras / Details (overview, facts, director/writers/cast) over a blurred, darkened backdrop.
+  Opened from Home tiles, banner More info, library posters, More like this.
+- `Search.kt`: search as you type (280 ms pause) with `repo.searchTitles`, poster grid, recent-search pills (Store's list,
+  shared with the TV's). Search button at the top right, ⌘F. TV's people / studios / did-you-mean sections not yet.
+- Screenshots added: desktop-details.png, desktop-search.png.
+
 ### Build 250 → Mac 0.3.167 (Mac: Java 25 + warm-start cache, snappier scrolling, self-update; TV unchanged)
 - Owner on Mac Home: some lag while tiles load; scrolling (especially sideways) not very responsive; tired of Privacy &
   Security → Open Anyway after every reinstall.

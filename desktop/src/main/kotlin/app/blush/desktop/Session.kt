@@ -27,6 +27,9 @@ sealed interface Screen {
     data object Home : Screen
     data object Libraries : Screen
     data class Library(val library: BaseItemDto) : Screen
+    /** A title's page; [preview] is what was already known about it (shown while the rest loads). */
+    data class Details(val id: java.util.UUID, val preview: BaseItemDto? = null) : Screen
+    data object Search : Screen
 }
 
 /** One person on "Who's watching?". [saved] is set when this Mac already holds their sign-in. */
@@ -56,6 +59,9 @@ class Session(val scope: CoroutineScope) {
     var home by mutableStateOf(HomeState())
         private set
 
+    /** What was last typed on the Search page (kept while browsing). */
+    var lastSearch = ""
+
     /** A short message at the bottom of the window (e.g. for things not built yet on the Mac). */
     var toastText by mutableStateOf<String?>(null)
         private set
@@ -73,7 +79,7 @@ class Session(val scope: CoroutineScope) {
 
     /** Replaces the whole history with [next] (after signing in or out). */
     fun reset(next: Screen) {
-        if (next == Screen.Home && screen !is Screen.Libraries && screen !is Screen.Library && screen != Screen.Home) home = HomeState()
+        if (next == Screen.Home && (screen == Screen.Profiles || screen is Screen.Password || screen == Screen.Server || screen == Screen.Starting)) home = HomeState()
         history.clear(); screen = next
     }
 
