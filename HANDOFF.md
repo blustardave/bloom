@@ -125,7 +125,7 @@ Shared with the Mac app: `shared/src/commonMain/kotlin/app/blush/tv/` (same pack
 
 ## Change history (newest first)
 
-### Builds 246–247 → app 0.3.163–0.3.164 (Mac port phase 2: sign in and browse libraries on the Mac; TV unchanged)
+### Builds 244–246 → app 0.3.161–0.3.163 (Mac port phase 2: sign in and browse libraries on the Mac; TV unchanged)
 - Shared data layer: `Repo`, `Store`, `HomeCache`, `FilteredPager` and `ui/Format.kt` moved to `shared/src/jvmShared/kotlin`
   (same packages), a folder compiled into both the Android and desktop targets because it needs the JDK and Jellyfin SDK.
   `Repo(jellyfin, baseDevice, cacheDir, store)`: each app builds its own SDK instance (Android needs a Context) — see
