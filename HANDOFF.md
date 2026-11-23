@@ -125,6 +125,16 @@ Shared with the Mac app: `shared/src/commonMain/kotlin/app/blush/tv/` (same pack
 
 ## Change history (newest first)
 
+### Build 239 → app 0.3.156 (Mac: no white edge while resizing, faster launches; TV unchanged)
+- Owner tried Bloom.app on the Mac: opens, hover/click work, Dock icon shows. Reported: "feels a little slow" and a trailing
+  white border while resizing.
+- White border: the AWT window's own background was white and macOS fills new space with it before Skia draws; `Main.kt` now
+  sets window/contentPane/rootPane background to Graphite (synchronously in `remember`, before the first paint).
+- Launch speed: the launcher uses `-XX:+AutoCreateSharedArchive` (class data archive in ~/Library/Caches/app.blush.mac, per
+  version), so the second launch of each version starts faster. Hover fades 120 → 60 ms (Mac buttons react near-instantly).
+- CI prints the native libraries inside bloom.jar after `appJar` to confirm only macOS arm64 graphics code ships.
+- "Slow" not yet pinned down (launch vs. hover vs. resizing); asked the owner.
+
 ### Build 237 (new repo's run 1) → app 0.3.154 (Mac port phase 1: shared module + Bloom.app; no visible change on the TV)
 - Owner wants the Mac app **mouse/trackpad first** (not arrow keys); `docs/MAC_PORT.md` now has an "Input on the Mac" section.
 - New `shared/` Kotlin Multiplatform module (Android via AGP 9's `com.android.kotlin.multiplatform.library`, plus `jvm("desktop")`),

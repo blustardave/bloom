@@ -51,7 +51,7 @@ fun HoverPill(label: String, selected: Boolean, onClick: () -> Unit, modifier: M
             hovered -> Color.White.copy(alpha = 0.16f)
             else -> Color.White.copy(alpha = 0.07f)
         },
-        tween(120),
+        tween(60),
     )
     val fg by animateColorAsState(
         when {
@@ -59,7 +59,7 @@ fun HoverPill(label: String, selected: Boolean, onClick: () -> Unit, modifier: M
             hovered -> Color(0xFFF5F5F7)
             else -> Color(0xFFAEB1BB)
         },
-        tween(120),
+        tween(60),
     )
     val scale by animateFloatAsState(if (pressed) 0.96f else 1f, tween(90))
     Box(

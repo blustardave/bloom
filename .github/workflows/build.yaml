@@ -93,6 +93,8 @@ jobs:
       - name: Build the Mac app (Bloom.app)
         run: |
           ./gradlew :desktop:appJar -PdesktopTarget=macos-arm64 --stacktrace
+          echo "Graphics libraries in the jar (must be macOS arm64 only):"
+          unzip -l desktop/build/libs/bloom.jar | grep -iE "\.(dylib|so|dll)$" || true
           JRE_CACHE="$HOME/.cache/bloom-jre" desktop/mac/make-app.sh desktop/build/libs/bloom.jar "0.3.$(( BLOOM_BUILD - 83 ))" out-mac
       - name: Publish the Mac app to the "latest" release
         if: github.ref == 'refs/heads/main'

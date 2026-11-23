@@ -30,6 +30,9 @@ cat > "$APP/Contents/MacOS/Bloom" <<EOF
 #!/bin/sh
 # Starts Bloom with the Java runtime inside the app.
 CONTENTS="\$(cd "\$(dirname "\$0")/.." && pwd)"
+# Java keeps a ready-made copy of the classes it loaded at the first launch here, so later launches start faster.
+CACHE="\$HOME/Library/Caches/app.blush.mac"
+mkdir -p "\$CACHE"
 exec "\$CONTENTS/runtime/Contents/Home/bin/java" \\
   -Xdock:name=Bloom \\
   -Xdock:icon="\$CONTENTS/Resources/bloom.icns" \\
@@ -39,6 +42,7 @@ exec "\$CONTENTS/runtime/Contents/Home/bin/java" \\
   -Dskiko.renderApi=METAL \\
   -Dbloom.version=$VERSION \\
   -Xmx1g \\
+  -XX:+AutoCreateSharedArchive -XX:SharedArchiveFile="\$CACHE/bloom-$VERSION.jsa" \\
   -jar "\$CONTENTS/app/bloom.jar" "\$@"
 EOF
 chmod +x "$APP/Contents/MacOS/Bloom"
