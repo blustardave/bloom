@@ -141,7 +141,9 @@ Shared with the Mac app: `shared/src/commonMain/kotlin/app/blush/tv/` (same pack
 - Coil 3 on the Mac (disk cache in ~/Library/Caches/app.blush.mac/images), slf4j-nop for the SDK.
 - Window dragging: the window is drawn under a see-through title bar, so `WindowDraggableArea` strips (28 dp along the
   top, and the 56 dp top bar) are where it can be dragged. Untested whether macOS also drags natively there.
-- Screenshots now: desktop-server/profiles/password/libraries/library/menu.png, from invented names and titles.
+- Screenshots now: desktop-server/profiles/password/libraries/library/menu.png, from invented names and titles. Checked by eye
+  (build 246): hover rings, profile menu, accent outline while typing, grids. TV compiled; owner to confirm sign-in, settings
+  and playback still behave after the data-layer move (same SharedPreferences file "blush", so nothing should be lost).
 
 ### Build 240 → app 0.3.157 (Mac: instant button states, View → Show performance; TV unchanged)
 - Owner: the slowness is buttons reacting to the pointer/clicks. `HoverPill` now has no fades or press-dip animation (states
