@@ -45,6 +45,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.layout.layout
+import kotlin.math.roundToInt
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.zIndex
@@ -1474,6 +1475,10 @@ private fun HomeRowView(app: AppState, model: HomeModel, row: HomeRow, isFirst: 
     // Only poster rows grow a wide thumbnail under the remote; chips, numbered posters and cards keep their size.
     val growsWide = !row.playOnClick && !isChips && !row.numbered && tileOpen != TilePosters
     val tileWidth = when { isChips -> ChipWidth; row.numbered -> NumberedWidth; row.playOnClick -> CardWidth; else -> PosterWidth }
+    // Which tile is showing wide, and how wide. Every tile keeps its poster-sized slot in the row; the open one draws wider over
+    // the slot beside it and the tiles after it are drawn shifted right. Nothing in the row is re-measured when the remote moves.
+    val rowOpen = remember { RowOpen() }
+    val posterSlotPx = with(density) { PosterWidth.roundToPx() }
     val scope = rememberCoroutineScope()
     val total = (row.chips?.size ?: row.items.size) + (if (row.more != null) 1 else 0)
     var viewportPx by remember { androidx.compose.runtime.mutableIntStateOf(0) }
@@ -1533,34 +1538,10 @@ private fun HomeRowView(app: AppState, model: HomeModel, row: HomeRow, isFirst: 
     /** Slides the row so item [index] sits at the heading (the content's left edge). Focus itself never scrolls a row. */
     suspend fun alignTo(index: Int, base: Int = 210) {
         val st = row.state
-        // Worked out in absolute terms, not from where tiles happen to be drawn at this instant. In the finished layout every
-        // tile before the target is a poster, so the target sits at index * (tile + gap) from the start; the row is at
-        // (first visible index * (tile + gap) + how far into it) now. The focused tile being wide, or growing, or shrinking,
-        // or the picture not having been re-measured yet, cannot change either figure.
+        // Every slot in the row is the same width (the open tile only draws wider), so the target sits at index * (tile + gap)
+        // from the start and the row is at (first visible index * (tile + gap) + how far into it) now. No re-anchoring needed.
         val unit = with(density) { tileWidth.roundToPx() + 12.dp.roundToPx() }
-        var distance = (index * unit - (st.firstVisibleItemIndex * unit + st.firstVisibleItemScrollOffset)).toFloat()
-        // A list keeps its first visible tile where it is and lays everything before it backwards from there. So when the
-        // target is BEFORE the first visible tile (moving left), the target growing wide pushes its own left edge further out
-        // to the left. That is known in advance, so the row starts sliding straight away (no waiting for the new layout) by the
-        // distance to where the target will end up: where it is now, plus what the tiles from it up to the anchor are about to
-        // change by (the target grows to wide, any wide tile in between shrinks to a poster).
-        // (Any earlier slide has been cancelled by now, so the row is just where it is drawn.)
-        if (growsWide && index < st.firstVisibleItemIndex) {
-            val info = st.layoutInfo.visibleItemsInfo.firstOrNull { it.index == index }
-            if (info != null) {
-                // Re-anchor the list on the target, exactly where it is drawn now (so nothing moves yet). The list lays
-                // things out from its anchor: anchored on the tile being left, the target growing wide pushes its own left
-                // edge out to the left and everything to the right jumps back, then slides on again. Anchored on the target,
-                // it grows to the right instead, as a forward move does, and only the slide itself is seen. The offset is
-                // read from the layout as it stands, so this agrees with whichever layout the list is showing.
-                st.requestScrollToItem(index, -info.offset)
-                distance = info.offset.toFloat()
-            } else {
-                val posterPx = with(density) { PosterWidth.roundToPx() }
-                val widePx = with(density) { WideWidth.roundToPx() }
-                distance -= (widePx - posterPx)
-            }
-        }
+        val distance = (index * unit - (st.firstVisibleItemIndex * unit + st.firstVisibleItemScrollOffset)).toFloat()
         // Longer slides take a little longer, so they do not whip across.
         val dp = kotlin.math.abs(distance) / density.density
         val duration = (base * kotlin.math.sqrt((dp / 128f).coerceIn(1f, 1.3f))).toInt()
@@ -1750,6 +1731,9 @@ private fun HomeRowView(app: AppState, model: HomeModel, row: HomeRow, isFirst: 
                         HoverPosterTile(
                             repo = repo,
                             item = item,
+                            index = i,
+                            rowOpen = rowOpen,
+                            slotPx = posterSlotPx,
                             tileKey = key,
                             preview = model.preview,
                             onClick = onClick,
@@ -1769,7 +1753,9 @@ private fun HomeRowView(app: AppState, model: HomeModel, row: HomeRow, isFirst: 
                     item(key = "more") {
                         val moreKey = "more-${row.key}"
                         val openAll = { model.leaving = true; app.go(Route.Category(row.key)) }
+                        val moreIndex = row.items.size
                         val moreModifier = Modifier
+                            .then(if (growsWide) Modifier.graphicsLayer { translationX = rowOpen.shiftFor(moreIndex, posterSlotPx) } else Modifier)
                             .restorableFocus(model.focus, moreKey)
                             .onFocusChanged { if (it.hasFocus) { focusedIdx[0] = row.items.size; model.focus.remember(moreKey); model.heroFocused = false } }
                         if (row.playOnClick) ViewAllCard(CardWidth, onClick = openAll, modifier = moreModifier)
@@ -1782,6 +1768,21 @@ private fun HomeRowView(app: AppState, model: HomeModel, row: HomeRow, isFirst: 
 }
 
 private val PosterHeight = PosterWidth * 1.5f
+
+/**
+ * Which poster in a row is showing as its wide thumbnail. Plain snapshot state, read only in layout and drawing, so the remote
+ * moving along a row re-measures just the two tiles involved and shifts the rest while drawing, the way the big streaming apps
+ * do it, instead of the whole row laying itself out again on every press.
+ */
+@androidx.compose.runtime.Stable
+private class RowOpen {
+    var key by mutableStateOf<String?>(null)
+    var index by androidx.compose.runtime.mutableIntStateOf(-1)
+    /** How wide the open tile is drawn, in pixels. */
+    var width by androidx.compose.runtime.mutableFloatStateOf(0f)
+    /** How far right tile [i] is drawn: by the open tile's extra width, if it comes after it. */
+    fun shiftFor(i: Int, slotPx: Int): Float = if (index in 0 until i) (width - slotPx).coerceAtLeast(0f) else 0f
+}
 private val WideWidth = PosterHeight * 16f / 9f
 
 private const val OpenNone = 0     // arriving from below (Up), or leaving up or down: no animation at all
@@ -1790,8 +1791,9 @@ private const val OpenCut = 3      // along a row: the thumbnail is just there, 
 private const val OpenReveal = 2   // arriving from above (Down): the tile itself extends the last fifth of its width
 
 /**
- * A poster that, while it has the remote, IS its wide thumbnail: the tile takes the wider room itself (the ring goes round the
- * thumbnail). Along a row the layout changes in one step and only the drawing is eased (nothing is re-measured): the new tile's
+ * A poster that, while it has the remote, IS its wide thumbnail (the ring goes round the thumbnail). The row only ever sees a
+ * poster-sized slot: the open tile draws wider over the gap beside it and the tiles after it are drawn shifted along (see
+ * [RowOpen]), so the row itself is never laid out again as the remote moves. Along a row the layout changes in one step and only the drawing is eased (nothing is re-measured): the new tile's
  * thumbnail fades up while the tile just left fades back to its poster, so it reads as one thumbnail handing over to the next.
  * Arriving from above, the tile itself extends the last fifth (ring, picture and neighbours moving together); that happens
  * once, briefly, per row change. Arriving from below nothing is animated. Only the tile that has the remote (or has just lost
@@ -1799,7 +1801,10 @@ private const val OpenReveal = 2   // arriving from above (Down): the tile itsel
  */
 @Composable
 private fun HoverPosterTile(
-    repo: Repo, item: BaseItemDto, tileKey: String, preview: PreviewController?, onClick: () -> Unit, onFocused: () -> Unit, lastKey: () -> Key?,
+    repo: Repo, item: BaseItemDto,
+    /** This tile's place in the row, and the row's record of which tile is open (see [RowOpen]). */
+    index: Int, rowOpen: RowOpen, slotPx: Int,
+    tileKey: String, preview: PreviewController?, onClick: () -> Unit, onFocused: () -> Unit, lastKey: () -> Key?,
     leavesRow: (Key?) -> Boolean, prevThumb: () -> String?, setPrevThumb: (String?) -> Unit,
     /** [TileNow] or [TilePosters]. */
     openMode: Int,
@@ -1816,7 +1821,24 @@ private fun HoverPosterTile(
     var under by remember { mutableStateOf<String?>(null) }
     // The poster's own colour fills the tile until the poster arrives.
     val tint = remember(item.id) { item.posterTint() }
-    Box(Modifier.onFocusChanged {
+    val density = LocalDensity.current
+    val widePx = with(density) { WideWidth.toPx() }
+    // Tells the row how wide this tile is drawn (read by the row only while drawing and by this tile's own layout).
+    fun claim(width: Float) { rowOpen.key = tileKey; rowOpen.index = index; rowOpen.width = width }
+    fun release() { if (rowOpen.key == tileKey) { rowOpen.key = null; rowOpen.index = -1 } }
+    // The row's items can be reloaded (Watchlist): keep the open tile's place right if it moved.
+    androidx.compose.runtime.SideEffect { if (rowOpen.key == tileKey && rowOpen.index != index) rowOpen.index = index }
+    DisposableEffect(tileKey) { onDispose { release() } }
+    Box(Modifier
+        // After the open tile, every tile is drawn shifted right by how much wider it is. Read while drawing: no re-measure.
+        .graphicsLayer { translationX = rowOpen.shiftFor(index, slotPx) }
+        // Always a poster-sized slot to the row; the tile inside is as wide as it is shown. Only this tile is re-measured.
+        .layout { m, c ->
+            val w = if (rowOpen.key == tileKey) rowOpen.width.roundToInt() else slotPx
+            val placeable = m.measure(c.copy(minWidth = w, maxWidth = w))
+            layout(slotPx, placeable.height) { placeable.placeRelative(0, 0) }
+        }
+        .onFocusChanged {
         if (it.hasFocus != focused) {
             val key = lastKey()
             mode = if (it.hasFocus) {
@@ -1825,6 +1847,7 @@ private fun HoverPosterTile(
                 when (key) { Key.DirectionLeft, Key.DirectionRight -> OpenCut; else -> OpenNone }
             }
             extend = if (it.hasFocus && mode == OpenReveal) 0f else 1f
+            val widens = openMode != TilePosters
             // Along a row the new thumbnail fades up OVER the one just left (same pixels), never through the dark tile.
             // Whichever order the old and new tile are told in, the new one reads what the last one to gain the remote showed.
             if (it.hasFocus) {
@@ -1840,19 +1863,15 @@ private fun HoverPosterTile(
             open = (it.hasFocus && openMode != TilePosters) || (!it.hasFocus && open && leavesRow(Key.Enter))
             // The preview belongs to the tile with the remote: it starts after a rest here and goes the moment the remote leaves.
             if (openMode != TilePosters) { if (it.hasFocus) preview?.hover(tileKey, item) else if (!leavesRow(Key.Enter)) preview?.release(tileKey) }
+            if (widens && (open || stayWide)) claim(if (mode == OpenReveal && it.hasFocus) widePx * 0.93f else widePx) else release()
         }
     }) {
         FocusSurface(
             onClick = onClick,
             onFocused = onFocused,
             onLongPress = onLongPress,
-            modifier = modifier.height(PosterHeight).width(
-                when {
-                    !open && !stayWide -> PosterWidth
-                    mode == OpenReveal -> WideWidth * (0.93f + 0.07f * extend)
-                    else -> WideWidth
-                },
-            ),
+            // As wide as the slot handed down above (poster, or the wide thumbnail and its reveal).
+            modifier = modifier.height(PosterHeight).fillMaxWidth(),
             background = tint ?: Blush.colors.surface,
             // No zoom: the tile already grows, and a zoom would push its left edge off the heading. (A poster that never
             // opens gets a small one instead, so the remote is easy to follow.)
@@ -1866,7 +1885,7 @@ private fun HoverPosterTile(
                     RemoteImage(poster, Modifier.fillMaxSize(), crossfade = false)
                 }
             }
-            if (open || stayWide || lingering) TileThumb(repo, item, open, mode, under, preview, tileKey, onExtend = { extend = it }) { lingering = false; under = null }
+            if (open || stayWide || lingering) TileThumb(repo, item, open, mode, under, preview, tileKey, onExtend = { extend = it; if (rowOpen.key == tileKey) rowOpen.width = widePx * (0.93f + 0.07f * it) }) { lingering = false; under = null }
             ProgressLine(item.progress())
         }
     }

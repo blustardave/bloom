@@ -125,6 +125,16 @@ Shared with the Mac app: `shared/src/commonMain/kotlin/app/blush/tv/` (same pack
 
 ## Change history (newest first)
 
+### Build 258 → app 0.3.175 (Home: the row no longer re-lays itself out on every press — AUDIT P3)
+- `HoverPosterTile` used to change its real width (poster ↔ wide thumbnail), so each Left/Right re-measured the whole
+  `LazyRow`, and `alignTo` had to re-anchor the list when moving left. Now each tile always reports a poster-sized slot
+  (a `layout` modifier on the tile's root measures its content at the shown width but reports `slotPx`), and the tiles after
+  the open one (and View all) are drawn shifted right by the extra width in `graphicsLayer`. The row-level `RowOpen`
+  (key, index, width) is read only in layout/draw. Looks the same as before; the reveal from above still animates the width.
+- `alignTo` lost its re-anchoring branch: every slot is the same width, so the distance is just index × (tile + gap).
+- Untested on the stick. If anything looks wrong: neighbours overlapping the open tile, the ring in the wrong place, or
+  Left/Right skipping a tile with Settings → Home → quicker movement off (focus search uses the shifted positions).
+
 ### Build 257 → app 0.3.174 (errors are recorded instead of thrown away; Mac app paused)
 - **Plan agreed with the owner (24 Nov 2026):** Fire TV first. Step 1 = stop hiding errors (this build). Step 2 = replace the
   focus workarounds (the 300 ms watchdog in `SideRail.WithRail`, the "wait a frame and retry requestFocus" loops) one per build,
