@@ -26,13 +26,13 @@ object HomeCache {
         return java.io.File(repo.cacheDir, "home-$server-$user.json")
     }
 
-    fun read(repo: Repo): SavedHome? = runCatching {
+    fun read(repo: Repo): SavedHome? = logged("HomeCache.read") {
         val f = file(repo)?.takeIf { it.exists() } ?: return null
         json.decodeFromString(SavedHome.serializer(), f.readText())
     }.getOrNull()
 
     fun write(repo: Repo, home: SavedHome) {
-        runCatching {
+        logged("HomeCache.write") {
             val f = file(repo) ?: return
             val tmp = java.io.File(f.path + ".tmp")
             tmp.writeText(json.encodeToString(SavedHome.serializer(), home))
@@ -41,6 +41,6 @@ object HomeCache {
     }
 
     fun forget(repo: Repo) {
-        runCatching { file(repo)?.delete() }
+        logged("HomeCache.forget") { file(repo)?.delete() }
     }
 }

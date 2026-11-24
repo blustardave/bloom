@@ -1,6 +1,7 @@
 package app.blush.tv.playback
 
 import app.blush.tv.BlushApplication
+import app.blush.tv.data.logged
 import android.content.Context
 import android.media.AudioFormat
 import android.media.AudioManager
@@ -92,7 +93,7 @@ object DeviceCapabilities {
             var maxH = 0
             val profiles = mutableSetOf<String>()
             matching.forEach { info ->
-                runCatching {
+                logged("Playback") {
                     val caps = info.getCapabilitiesForType(c.mime)
                     // The names the server uses for a stream's profile, for the profiles this decoder lists.
                     caps.profileLevels.forEach { pl ->
@@ -126,7 +127,7 @@ object DeviceCapabilities {
 
     /** Whether the device has a Dolby Vision decoder at all (the cheaper sticks don't). */
     private val dolbyVision: Boolean by lazy {
-        runCatching {
+        logged("Playback") {
             MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos.any { info ->
                 !info.isEncoder && info.supportedTypes.any { it.equals("video/dolby-vision", ignoreCase = true) }
             }
@@ -393,7 +394,7 @@ suspend fun Repo.preparePlayback(
 }
 
 suspend fun Repo.reportStart(source: PlaybackSource, positionTicks: Long) = withContext(Dispatchers.IO) {
-    runCatching {
+    logged("Playback.reportStart") {
         api.playStateApi.reportPlaybackStart(
             PlaybackStartInfo(
                 canSeek = true,
@@ -414,7 +415,7 @@ suspend fun Repo.reportStart(source: PlaybackSource, positionTicks: Long) = with
 }
 
 suspend fun Repo.reportProgress(source: PlaybackSource, positionTicks: Long, paused: Boolean, audioIndex: Int?, subtitleIndex: Int?) = withContext(Dispatchers.IO) {
-    runCatching {
+    logged("Playback.reportProgress") {
         api.playStateApi.reportPlaybackProgress(
             PlaybackProgressInfo(
                 canSeek = true,
@@ -435,7 +436,7 @@ suspend fun Repo.reportProgress(source: PlaybackSource, positionTicks: Long, pau
 }
 
 suspend fun Repo.reportStopped(source: PlaybackSource, positionTicks: Long) = withContext(Dispatchers.IO) {
-    runCatching {
+    logged("Playback.reportStopped") {
         api.playStateApi.reportPlaybackStopped(
             PlaybackStopInfo(
                 itemId = source.item.id,
@@ -454,7 +455,7 @@ suspend fun Repo.reportStopped(source: PlaybackSource, positionTicks: Long) = wi
     val runtime = source.mediaSource.runTimeTicks ?: source.item.runTimeTicks ?: 0L
     if (positionTicks >= 150_000_000L) {
         val keepPlace = runtime <= 0L || positionTicks < runtime * 0.9
-        runCatching {
+        logged("Playback.reportStopped") {
             api.itemsApi.updateItemUserData(
                 itemId = source.item.id,
                 userId = userId,
@@ -471,7 +472,7 @@ suspend fun Repo.reportStopped(source: PlaybackSource, positionTicks: Long) = wi
 suspend fun Repo.stopConversion(source: PlaybackSource) = withContext(Dispatchers.IO) {
     val session = source.playSessionId ?: return@withContext
     if (source.method != PlayMethod.TRANSCODE) return@withContext
-    runCatching { api.hlsSegmentApi.stopEncodingProcess(deviceId = api.deviceInfo.id, playSessionId = session) }
+    logged("Playback.stopConversion") { api.hlsSegmentApi.stopEncodingProcess(deviceId = api.deviceInfo.id, playSessionId = session) }
 }
 
 /**
@@ -507,5 +508,5 @@ fun Repo.previewClipUrl(item: BaseItemDto, startMs: Long, audioIndex: Int?, sess
 
 /** Tells the server to stop making a preview clip (it also stops when the stick closes the connection). */
 suspend fun Repo.stopPreviewClip(sessionId: String) = withContext(Dispatchers.IO) {
-    runCatching { api.hlsSegmentApi.stopEncodingProcess(deviceId = api.deviceInfo.id, playSessionId = sessionId) }
+    logged("Playback.stopPreviewClip") { api.hlsSegmentApi.stopEncodingProcess(deviceId = api.deviceInfo.id, playSessionId = sessionId) }
 }

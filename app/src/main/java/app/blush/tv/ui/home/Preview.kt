@@ -3,6 +3,7 @@
 package app.blush.tv.ui.home
 
 import android.content.Context
+import app.blush.tv.data.logged
 import android.os.SystemClock
 import android.view.TextureView
 import androidx.compose.animation.core.Animatable
@@ -191,13 +192,13 @@ class PreviewController(
     /** What to play for a title (asked of the server once, then remembered): null if it has no usable clip. */
     private suspend fun plan(item: BaseItemDto): Plan? {
         if (plans.containsKey(item.id)) return plans[item.id]
-        val made = runCatching {
-            val target = repo.previewSource(item) ?: return@runCatching null
+        val made = logged("Preview.plan") {
+            val target = repo.previewSource(item) ?: return@logged null
             // The full record: tiles do not carry the sound tracks.
-            val full = runCatching { repo.item(target.id) }.getOrDefault(target)
-            val runtimeMs = ((full.runTimeTicks ?: target.runTimeTicks) ?: return@runCatching null) / TicksPerMs
-            if (runtimeMs < 120_000) return@runCatching null
-            val skips = runCatching {
+            val full = logged("Preview.plan") { repo.item(target.id) }.getOrDefault(target)
+            val runtimeMs = ((full.runTimeTicks ?: target.runTimeTicks) ?: return@logged null) / TicksPerMs
+            if (runtimeMs < 120_000) return@logged null
+            val skips = logged("Preview.plan") {
                 repo.segments(target.id).filter { it.endTicks > it.startTicks }.map { (it.startTicks / TicksPerMs)..(it.endTicks / TicksPerMs) }
             }.getOrDefault(emptyList())
             val streams = full.mediaStreams ?: full.mediaSources?.firstOrNull()?.mediaStreams
@@ -244,7 +245,7 @@ class PreviewController(
     /** The way back if the server will not make a clip: the file itself, opened at [start]. Only used if the file can really be jumped into. */
     private suspend fun openDirect(p: ExoPlayer, plan: Plan, start: Long): Boolean {
         stopClip()
-        val source = runCatching { repo.preparePlayback(plan.target, 0, forPreview = true) }.getOrNull()?.takeIf { it.method != PlayMethod.TRANSCODE } ?: return false
+        val source = logged("Preview.openDirect") { repo.preparePlayback(plan.target, 0, forPreview = true) }.getOrNull()?.takeIf { it.method != PlayMethod.TRANSCODE } ?: return false
         failed = false
         ready = false
         p.playWhenReady = false

@@ -1,6 +1,7 @@
 package app.blush.tv.ui.search
 
 import android.Manifest
+import app.blush.tv.data.logged
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -157,7 +158,7 @@ fun SearchScreen(app: AppState) {
 
     LaunchedEffect(Unit) {
         if (restore.key == null) runCatching { firstKey.requestFocus() }
-        recent = runCatching { app.repo.recentlyAdded(20) }.getOrDefault(emptyList())
+        recent = logged("SearchScreen.open") { app.repo.recentlyAdded(20) }.getOrDefault(emptyList())
         // Builds the "who's who" index in the background, so people are ranked by fame once it's ready.
         app.repo.warmSearch()
     }
@@ -677,7 +678,7 @@ internal class VoiceSearch(private val context: Context, private val onSpoken: (
             message = "Voice search isn't available on this device"
             return
         }
-        runCatching {
+        logged("SearchScreen.start") {
             recognizer?.destroy()
             val r = SpeechRecognizer.createSpeechRecognizer(context)
             recognizer = r

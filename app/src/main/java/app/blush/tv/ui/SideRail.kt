@@ -1,6 +1,7 @@
 package app.blush.tv.ui
 
 import kotlinx.coroutines.delay
+import app.blush.tv.data.logged
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
@@ -204,7 +205,7 @@ private fun TopBar(
             val (outline, filled) = Icons.pinIcons[pin.icon] ?: Icons.pinIcons.values.first()
             add(PillItem("pin-${pin.libraryId}", pin.name, outline, filled) {
                 scope.launch {
-                    val library = runCatching { app.repo.libraries() }.getOrDefault(emptyList()).firstOrNull { it.id.toString() == pin.libraryId }
+                    val library = logged("SideRail.TopBar") { app.repo.libraries() }.getOrDefault(emptyList()).firstOrNull { it.id.toString() == pin.libraryId }
                     if (library != null) app.openLibrary(library)
                 }
             })

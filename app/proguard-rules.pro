@@ -18,3 +18,6 @@
 
 # Keep real class names so error messages and crash reports stay readable.
 -dontobfuscate
+
+# Keep file names and line numbers in stack traces, so crash reports and Settings → Recent errors point at the exact line.
+-keepattributes SourceFile,LineNumberTable

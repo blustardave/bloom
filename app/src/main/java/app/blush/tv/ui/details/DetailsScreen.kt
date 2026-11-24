@@ -1,6 +1,7 @@
 package app.blush.tv.ui.details
 
 import android.content.Intent
+import app.blush.tv.data.logged
 import android.net.Uri
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.animateFloat
@@ -188,7 +189,7 @@ fun DetailsScreen(app: AppState, itemId: UUID, preview: BaseItemDto? = null) {
     LaunchedEffect(itemId) {
         // Coming back from the player: let the position it just saved reach the server first.
         PlayerReports.settle()
-        runCatching { repo.item(itemId) }
+        logged("DetailsScreen.DetailsScreen") { repo.item(itemId) }
             .onSuccess { loaded ->
                 item = loaded
                 favourite = loaded.userData?.isFavorite == true
@@ -200,13 +201,13 @@ fun DetailsScreen(app: AppState, itemId: UUID, preview: BaseItemDto? = null) {
                     else -> Tab.Similar
                 }
                 launch {
-                    similar = runCatching { repo.moreLikeThis(loaded) }.getOrDefault(emptyList())
+                    similar = logged("DetailsScreen.DetailsScreen") { repo.moreLikeThis(loaded) }.getOrDefault(emptyList())
                     val loader = coil3.SingletonImageLoader.get(context)
                     // The grey tiles stay until the first two rows' pictures are in hand (two seconds at most), then they change over to the
                     // real tiles, whose pictures fade in: nothing pops in.
                     withTimeoutOrNull(2_000) {
                         similar.take(14).map { s ->
-                            async { repo.posterUrl(s)?.let { runCatching { loader.execute(coil3.request.ImageRequest.Builder(context).data(it).build()) } } }
+                            async { repo.posterUrl(s)?.let { logged("DetailsScreen.DetailsScreen") { loader.execute(coil3.request.ImageRequest.Builder(context).data(it).build()) } } }
                         }.awaitAll()
                     }
                     similarLoaded = true
@@ -214,12 +215,12 @@ fun DetailsScreen(app: AppState, itemId: UUID, preview: BaseItemDto? = null) {
                     // The rest are fetched quietly, ready for when you scroll down to them.
                     similar.drop(14).take(14).forEach { s -> repo.posterUrl(s)?.let { loader.enqueue(coil3.request.ImageRequest.Builder(context).data(it).build()) } }
                 }
-                launch { extras = runCatching { repo.extras(itemId) }.getOrDefault(emptyList()) }
+                launch { extras = logged("DetailsScreen.DetailsScreen") { repo.extras(itemId) }.getOrDefault(emptyList()) }
                 when (loaded.type) {
                     BaseItemKind.SERIES -> {
                         // Both asked of the server at once rather than one after the other.
-                        val nextAsk = async { runCatching { repo.nextEpisodeFor(itemId) }.getOrNull() }
-                        val seasonsAsk = async { runCatching { repo.seasons(itemId) }.getOrDefault(emptyList()) }
+                        val nextAsk = async { logged("DetailsScreen.DetailsScreen") { repo.nextEpisodeFor(itemId) }.getOrNull() }
+                        val seasonsAsk = async { logged("DetailsScreen.DetailsScreen") { repo.seasons(itemId) }.getOrDefault(emptyList()) }
                         val next = nextAsk.await()
                     nextEpisode = next
                     nextKnown = true
@@ -229,7 +230,7 @@ fun DetailsScreen(app: AppState, itemId: UUID, preview: BaseItemDto? = null) {
                         if (seasons.isEmpty()) episodesLoaded = true
 
                     }
-                    BaseItemKind.BOX_SET -> children = runCatching { repo.collectionItems(loaded) }.getOrDefault(emptyList())
+                    BaseItemKind.BOX_SET -> children = logged("DetailsScreen.DetailsScreen") { repo.collectionItems(loaded) }.getOrDefault(emptyList())
                     else -> {}
                 }
             }
@@ -239,7 +240,7 @@ fun DetailsScreen(app: AppState, itemId: UUID, preview: BaseItemDto? = null) {
     LaunchedEffect(seasonId) {
         val series = item ?: return@LaunchedEffect
         val season = seasonId ?: return@LaunchedEffect
-        episodes = runCatching { repo.episodes(series.id, season) }.getOrDefault(emptyList())
+        episodes = logged("DetailsScreen.DetailsScreen") { repo.episodes(series.id, season) }.getOrDefault(emptyList())
         episodesLoaded = true
 
     }
@@ -389,7 +390,7 @@ fun DetailsScreen(app: AppState, itemId: UUID, preview: BaseItemDto? = null) {
                         if (current.type != BaseItemKind.SERIES || nextKnown) {
                             val want = !favourite
                             favourite = want
-                            scope.launch { runCatching { repo.setFavorite(current.id, want) }.onFailure { favourite = !want } }
+                            scope.launch { logged("DetailsScreen.DetailsScreen") { repo.setFavorite(current.id, want) }.onFailure { favourite = !want } }
                         }
                     },
                                 modifier = if (target == null) Modifier.focusRequester(playFocus).onFocusChanged { playHasFocus = it.hasFocus } else Modifier,
@@ -403,7 +404,7 @@ fun DetailsScreen(app: AppState, itemId: UUID, preview: BaseItemDto? = null) {
                                     onClick = {
                                         val want = !played
                                         played = want
-                                        scope.launch { runCatching { repo.setPlayed(current.id, want) }.onFailure { played = !want } }
+                                        scope.launch { logged("DetailsScreen.DetailsScreen") { repo.setPlayed(current.id, want) }.onFailure { played = !want } }
                                     },
                                 )
                             }

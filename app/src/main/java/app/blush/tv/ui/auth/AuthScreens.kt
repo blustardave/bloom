@@ -1,6 +1,7 @@
 package app.blush.tv.ui.auth
 
 import android.os.Build
+import app.blush.tv.data.logged
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
@@ -328,13 +329,13 @@ fun ServerScreen(app: AppState) {
                 if (found.none { it.id == server.id }) found = found + server
             }
             if (isEmulator) {
-                launch { runCatching { withTimeout(6000) { app.repo.probe("10.0.2.2:8096") } }.onSuccess { addFound(it) } }
+                launch { logged("AuthScreens.findServers") { withTimeout(6000) { app.repo.probe("10.0.2.2:8096") } }.onSuccess { addFound(it) } }
             }
             // Jellyfin answers a broadcast on the local network, so most servers show up on their own.
             launch {
-                runCatching {
+                logged("AuthScreens.findServers") {
                     app.repo.discoverLocalServers().collect { info ->
-                        launch { runCatching { withTimeout(6000) { app.repo.probe(info.address) } }.onSuccess { addFound(it) } }
+                        launch { logged("AuthScreens.findServers") { withTimeout(6000) { app.repo.probe(info.address) } }.onSuccess { addFound(it) } }
                     }
                 }
             }
@@ -355,7 +356,7 @@ fun ServerScreen(app: AppState) {
         busy = true
         error = null
         scope.launch {
-            runCatching { withTimeout(20_000) { app.repo.connect(address.trim()) } }
+            logged("AuthScreens.connect") { withTimeout(20_000) { app.repo.connect(address.trim()) } }
                 .onSuccess { app.replaceAll(Route.Profiles) }
                 .onFailure {
                     error = when (it) {
@@ -448,7 +449,7 @@ fun ProfilesScreen(app: AppState) {
         error = null
         profiles = null
         val saved = app.repo.savedUsersForServer()
-        val public = runCatching { withTimeout(8_000) { app.repo.publicUsers() } }.onFailure { error = "Couldn't reach $serverName." }.getOrDefault(emptyList())
+        val public = logged("AuthScreens.ProfilesScreen") { withTimeout(8_000) { app.repo.publicUsers() } }.onFailure { error = "Couldn't reach $serverName." }.getOrDefault(emptyList())
         // At launch, a server that can't be found goes straight to "Connect to your server" (the saved server is kept).
         if (error != null && !app.splashDone) { app.replaceAll(Route.Server); return@LaunchedEffect }
         val fromServer = public.map { u ->
@@ -481,7 +482,7 @@ fun ProfilesScreen(app: AppState) {
         } else if (!p.hasPassword) {
             busy = true
             scope.launch {
-                runCatching { app.repo.signIn(p.name, "") }
+                logged("AuthScreens.choose") { app.repo.signIn(p.name, "") }
                     .onSuccess { app.signedIn(it) }
                     .onFailure { app.go(Route.SignIn(p.name, p.userId, p.imageTag)) }
                 busy = false
@@ -646,13 +647,13 @@ fun SignInScreen(app: AppState, route: Route.SignIn) {
     // Quick Connect: show a code to approve from another device signed in to Jellyfin.
     LaunchedEffect(Unit) {
         while (isActive) {
-            val started = runCatching { app.repo.startQuickConnect() }.getOrNull() ?: return@LaunchedEffect
+            val started = logged("AuthScreens.SignInScreen") { app.repo.startQuickConnect() }.getOrNull() ?: return@LaunchedEffect
             quickCode = started.first
             // Jellyfin's code lasts about ten minutes; ask for a fresh one a little before that.
             val until = System.currentTimeMillis() + 9 * 60_000L
             while (isActive && System.currentTimeMillis() < until) {
                 delay(4000)
-                val user = runCatching { app.repo.pollQuickConnect(started.second) }.getOrNull()
+                val user = logged("AuthScreens.SignInScreen") { app.repo.pollQuickConnect(started.second) }.getOrNull()
                 if (user != null) {
                     app.signedIn(user)
                     return@LaunchedEffect
@@ -666,7 +667,7 @@ fun SignInScreen(app: AppState, route: Route.SignIn) {
         busy = true
         error = null
         scope.launch {
-            runCatching { withTimeout(15_000) { app.repo.signIn(username.trim(), password) } }
+            logged("AuthScreens.submit") { withTimeout(15_000) { app.repo.signIn(username.trim(), password) } }
                 .onSuccess { app.signedIn(it) }
                 .onFailure {
                     // Only a reply from the server means the details were wrong; otherwise it was a connection problem.

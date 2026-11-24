@@ -5,6 +5,11 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+    inputs:
+      mac:
+        description: Build the Mac app too (paused by default)
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -39,7 +44,9 @@ jobs:
           echo "Changed files:"; echo "$CHANGED"
           BOTH='^(shared/|gradle/|build\.gradle\.kts|settings\.gradle\.kts|gradle\.properties|gradlew|\.github/)'
           if [ "$CHANGED" = "(everything)" ] || echo "$CHANGED" | grep -qE "$BOTH|^app/"; then echo "BUILD_TV=true" >> "$GITHUB_ENV"; fi
-          if [ "$CHANGED" = "(everything)" ] || echo "$CHANGED" | grep -qE "$BOTH|^desktop/"; then echo "BUILD_MAC=true" >> "$GITHUB_ENV"; fi
+          # The Mac app is paused (24 Nov 2026: Fire TV comes first). Its code stays in desktop/; it's only built when a run is
+          # started by hand from the Actions tab with "Build the Mac app" ticked.
+          if [ "${{ inputs.mac }}" = "true" ]; then echo "BUILD_MAC=true" >> "$GITHUB_ENV"; fi
       - name: Set up Java
         uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:

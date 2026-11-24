@@ -1,6 +1,7 @@
 package app.blush.tv.ui.browse
 
 import app.blush.tv.ui.components.GentleScrolling
+import app.blush.tv.data.logged
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
@@ -319,7 +320,7 @@ private fun BrowsePage(app: AppState, src: BrowseSource) {
     }
 
     LaunchedEffect(Unit) {
-        genres = runCatching { repo.genres(src.parentId) }.getOrDefault(emptyList())
+        genres = logged("LibraryScreen.BrowsePage") { repo.genres(src.parentId) }.getOrDefault(emptyList())
         total = src.count()
     }
     fun focusFilterButton() {
@@ -1102,7 +1103,7 @@ private fun GenreRows(
         coroutineScope {
             for (g in genres) launch {
                 gate.withPermit {
-                    val result = runCatching { loadRow(g) }.getOrNull()
+                    val result = logged("LibraryScreen.GenreRows") { loadRow(g) }.getOrNull()
                     counts[g] = result?.second?.takeIf { it != UnknownTotal } ?: result?.first?.size ?: 0
                     data[g] = result?.first ?: emptyList()
                 }

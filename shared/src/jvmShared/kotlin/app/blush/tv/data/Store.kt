@@ -49,14 +49,14 @@ class Store(private val prefs: Prefs) {
     private val json = Json { ignoreUnknownKeys = true }
 
     var server: SavedServer?
-        get() = prefs.getString("server", null)?.let { runCatching { json.decodeFromString(SavedServer.serializer(), it) }.getOrNull() }
+        get() = prefs.getString("server", null)?.let { logged("Store") { json.decodeFromString(SavedServer.serializer(), it) }.getOrNull() }
         set(value) = prefs.edit().apply {
             if (value == null) remove("server") else putString("server", json.encodeToString(SavedServer.serializer(), value))
         }.apply()
 
     val users: List<SavedUser>
         get() = prefs.getString("users", null)
-            ?.let { runCatching { json.decodeFromString(ListSerializer(SavedUser.serializer()), it) }.getOrNull() }
+            ?.let { logged("Store") { json.decodeFromString(ListSerializer(SavedUser.serializer()), it) }.getOrNull() }
             .orEmpty()
 
     fun saveUser(user: SavedUser) {
@@ -289,7 +289,7 @@ class Store(private val prefs: Prefs) {
         val key = "railPins:$serverId:$userId"
         val older = prefs.getString("railPins:$userId", null)?.let { "railPins:$userId" } ?: "railPins".takeIf { prefs.contains(it) }
         val saved = prefs.getString(key, null) ?: older?.let { k -> prefs.getString(k, null)?.also { prefs.edit().putString(key, it).remove(k).apply() } }
-        return saved?.let { runCatching { json.decodeFromString(ListSerializer(RailPin.serializer()), it) }.getOrNull() }.orEmpty()
+        return saved?.let { logged("Store.railPins") { json.decodeFromString(ListSerializer(RailPin.serializer()), it) }.getOrNull() }.orEmpty()
     }
 
     fun setRailPins(serverId: String?, userId: String?, value: List<RailPin>) =

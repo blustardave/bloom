@@ -1,6 +1,7 @@
 package app.blush.tv.ui.home
 
 import androidx.compose.animation.Crossfade
+import app.blush.tv.data.logged
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateDpAsState
@@ -165,7 +166,7 @@ internal fun HeroBlock(app: AppState, model: HomeModel, hero: BaseItemDto?, idle
                         if (!model.heroBusy) scope.launch {
                             model.heroBusy = true
                             // A series plays its next episode (or, with none to play, opens its page).
-                            val episode = try { runCatching { repo.nextEpisodeFor(hero.id) }.getOrNull() } finally { model.heroBusy = false }
+                            val episode = try { logged("Hero.HeroBlock") { repo.nextEpisodeFor(hero.id) }.getOrNull() } finally { model.heroBusy = false }
                                 if (episode != null) {
                                     app.go(Route.Details(hero.id, preview = hero))
                                     app.go(Route.Player(episode))
@@ -202,7 +203,7 @@ internal fun HeroBlock(app: AppState, model: HomeModel, hero: BaseItemDto?, idle
                         model.listed[hero.id] = want
                         model.listedItems[hero.id] = hero
                         scope.launch {
-                            val ok = runCatching { repo.setFavorite(hero.id, want) }.getOrDefault(false)
+                            val ok = logged("Hero.HeroBlock") { repo.setFavorite(hero.id, want) }.getOrDefault(false)
                             if (!ok) model.listed[hero.id] = !want else model.refreshProgress()
                         }
                     },

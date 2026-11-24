@@ -1,6 +1,7 @@
 package app.blush.tv.ui.home
 
 import app.blush.tv.data.SurpriseOptions
+import app.blush.tv.data.logged
 import app.blush.tv.ui.components.PopupPanel
 import app.blush.tv.ui.components.PopupRow
 import app.blush.tv.ui.components.rememberFirstFocus
@@ -311,7 +312,7 @@ class HomeModel(private val repo: Repo, private val categories: MutableMap<Strin
     suspend fun load() {
         // A cancelled load (you left Home before it finished) is not a failure and must not count as loaded,
         // otherwise the missing rows would never be fetched. runCatching would swallow the cancellation.
-        val outcome = runCatching {
+        val outcome = logged("HomeScreen.load") {
             coroutineScope {
                 // Home is the same all day: everything picked at random (which decade, which genres, the order of the rows,
                 // whose films) is picked from the date, so it comes out the same until tomorrow.
@@ -325,7 +326,7 @@ class HomeModel(private val repo: Repo, private val categories: MutableMap<Strin
                     ?.takeIf { it.settings == signature && it.rows.isNotEmpty() }
                 val today = saved?.takeIf { it.day == day }
                 val kept = today?.rows.orEmpty().associateBy { it.key + "|" + it.title }
-                val resumeJob = async { runCatching { repo.resume() }.getOrDefault(emptyList()) }
+                val resumeJob = async { logged("HomeScreen.load") { repo.resume() }.getOrDefault(emptyList()) }
                 // 0: last time's Home is about to be shown; 1: it is on screen; 2: there is none, rows appear as they load.
                 var mode = if (saved != null) 0 else 2
                 var afterSaved: () -> Unit = {}
@@ -344,7 +345,7 @@ class HomeModel(private val repo: Repo, private val categories: MutableMap<Strin
                 }
                 // The banner's titles come first of all.
                 launch {
-                    featured = today?.featured?.takeIf { it.isNotEmpty() } ?: runCatching { repo.featured(8) }.getOrDefault(emptyList())
+                    featured = today?.featured?.takeIf { it.isNotEmpty() } ?: logged("HomeScreen.load") { repo.featured(8) }.getOrDefault(emptyList())
                     lastHeroChange = System.currentTimeMillis()
                     featuredDone = true
                 }
@@ -353,8 +354,8 @@ class HomeModel(private val repo: Repo, private val categories: MutableMap<Strin
                 val live = setOf("recent", "new", "watchlist", "again", "foryou", "numbered")
                 suspend fun firstPage(key: String, spec: CategorySpec, n: Int, gate: Semaphore? = null): List<BaseItemDto> {
                     if (key !in live) kept[key + "|" + spec.title]?.let { return it.items }
-                    return if (gate == null) runCatching { spec.load(0, n).first }.getOrDefault(emptyList())
-                    else gate.withPermit { runCatching { spec.load(0, n).first }.getOrDefault(emptyList()) }
+                    return if (gate == null) logged("HomeScreen.firstPage") { spec.load(0, n).first }.getOrDefault(emptyList())
+                    else gate.withPermit { logged("HomeScreen.firstPage") { spec.load(0, n).first }.getOrDefault(emptyList()) }
                 }
                 val year = Year.now().value
                 val decades = listOf(1970, 1980, 1990, 2000, 2010).shuffled(dice(1)).take(1)
@@ -374,7 +375,7 @@ class HomeModel(private val repo: Repo, private val categories: MutableMap<Strin
                     add("gems" to spec("Hidden gems") { s, n -> repo.browsePage(types = listOf(BaseItemKind.MOVIE), minRating = 7.2, unplayedOnly = true, sortBy = ItemSortBy.RANDOM, years = (1950..year - 5).toList(), start = s, limit = n) })
                 }
                 // Genre rows: the ones pinned in Settings first, then a random mix up to the chosen number.
-                val allGenres = runCatching { withTimeoutOrNull(4_000) { repo.genres() } }.getOrNull() ?: emptyList()
+                val allGenres = logged("HomeScreen.firstPage") { withTimeoutOrNull(4_000) { repo.genres() } }.getOrNull() ?: emptyList()
                 val pinned = repo.store.pinnedGenres.filter { it in allGenres }
                 val genres = (pinned + (allGenres - pinned.toSet()).shuffled(dice(2))).take(maxOf(repo.store.genreRowCount, pinned.size))
                 val hidden = repo.store.hiddenHomeRows
@@ -420,10 +421,10 @@ class HomeModel(private val repo: Repo, private val categories: MutableMap<Strin
                     moodByKey["mood-docs"]?.let { add(Chip("True stories", it)) }
                 })
 
-                val lastJob = async { runCatching { repo.lastWatched() }.getOrNull() }
+                val lastJob = async { logged("HomeScreen.byGenre") { repo.lastWatched() }.getOrNull() }
                 val becauseJob = async {
-                    runCatching {
-                        val seed = lastJob.await() ?: return@runCatching null
+                    logged("HomeScreen.byGenre") {
+                        val seed = lastJob.await() ?: return@logged null
                         val similar = repo.similar(seed.id)
                         if (similar.size >= 4) seed to similar else null
                     }.getOrNull()
@@ -550,9 +551,9 @@ class HomeModel(private val repo: Repo, private val categories: MutableMap<Strin
                 // The genre chips: most films first. Counted with one small request per genre, all at once.
                 if (GenreChips) launch {
                     val names = allGenres.filterNot { it.equals("Action & Adventure", ignoreCase = true) }
-                    val counted = if (names.size < 4) emptyList() else runCatching {
+                    val counted = if (names.size < 4) emptyList() else logged("HomeScreen.genreChips") {
                         withTimeoutOrNull(3_000) {
-                            names.map { g -> async { g to runCatching { repo.browsePage(types = listOf(BaseItemKind.MOVIE), genre = g, start = 0, limit = 1).second }.getOrDefault(0) } }.awaitAll()
+                            names.map { g -> async { g to logged("HomeScreen.genreChips") { repo.browsePage(types = listOf(BaseItemKind.MOVIE), genre = g, start = 0, limit = 1).second }.getOrDefault(0) } }.awaitAll()
                         }
                     }.getOrNull() ?: names.map { it to 1 }
                     val chosen = counted.filter { it.second > 0 }.sortedByDescending { it.second }.map { it.first }.take(14)
@@ -585,7 +586,7 @@ class HomeModel(private val repo: Repo, private val categories: MutableMap<Strin
                 // "Starring …" two well-known faces from your library, and "From …" a big studio; different each visit.
                 launch {
                     delay(1_200)
-                    val (people, studios) = runCatching { repo.popularCredits() }.getOrNull()
+                    val (people, studios) = logged("HomeScreen.dynamicRow") { repo.popularCredits() }.getOrNull()
                         ?: return@launch listOf("starring", "starring2", "studio").forEach { done(it) }
                     if (people.size < 2) done("starring2")
                     if (people.isEmpty()) done("starring")
@@ -600,7 +601,7 @@ class HomeModel(private val repo: Repo, private val categories: MutableMap<Strin
                 }
                 // "Directed by …": directors with plenty of titles on the server.
                 launch {
-                    val directors = runCatching { repo.popularDirectors(8) }.getOrDefault(emptyList()).shuffled(dice(7)).take(2)
+                    val directors = logged("HomeScreen.dynamicRow") { repo.popularDirectors(8) }.getOrDefault(emptyList()).shuffled(dice(7)).take(2)
                     if (directors.size < 2) done("directed2")
                     if (directors.isEmpty()) done("directed")
                     directors.forEachIndexed { i, d ->
@@ -628,7 +629,7 @@ class HomeModel(private val repo: Repo, private val categories: MutableMap<Strin
         outcome.onFailure { error = "Couldn't load your library. Check the server is running." }
         // Every row quietly turns a failed request into "nothing here", so an unreachable server would look like an
         // empty library. If nothing arrived at all, check the server and say so.
-        if (error == null && rows.isEmpty() && runCatching { repo.libraries() }.isFailure) {
+        if (error == null && rows.isEmpty() && logged("HomeScreen.fetchRow") { repo.libraries() }.isFailure) {
             error = "Couldn't reach your server. Check it's on and on the same network."
         }
         this.loaded = true
@@ -750,7 +751,7 @@ class HomeModel(private val repo: Repo, private val categories: MutableMap<Strin
     /** After watching something, refresh Continue watching. */
     suspend fun refreshProgress() {
         app.blush.tv.ui.player.PlayerReports.settle()
-        val resume = runCatching { repo.resume() }.getOrNull() ?: return
+        val resume = logged("HomeScreen.refreshProgress") { repo.resume() }.getOrNull() ?: return
         val withoutResume = rows.filterNot { it.key == "resume" }
         val old = rows.firstOrNull { it.key == "resume" }
         var updated = when {
@@ -773,7 +774,7 @@ class HomeModel(private val repo: Repo, private val categories: MutableMap<Strin
         if ("watchlist" in repo.store.hiddenHomeRows) return null
         val limit = 20
         val spec = spec("On your watchlist") { s, n -> repo.browsePage(favouritesOnly = true, sortBy = ItemSortBy.DATE_CREATED, descending = true, start = s, limit = n) }
-        val loaded = runCatching { spec.load(0, limit).first }.getOrNull() ?: return null
+        val loaded = logged("HomeScreen.refreshWatchlistRow") { spec.load(0, limit).first }.getOrNull() ?: return null
         val added = listedItems.values.filter { listed[it.id] == true }.map { it.copy(userData = it.userData?.copy(isFavorite = true)) }
         val fresh = (added + loaded.filter { l -> listed[l.id] != false && added.none { it.id == l.id } }).take(limit)
         val old = current.firstOrNull { it.key == "watchlist" }
@@ -991,8 +992,8 @@ fun HomeScreen(app: AppState, model: HomeModel) {
     suspend fun warm(item: BaseItemDto) {
         val loader = coil3.SingletonImageLoader.get(context)
         coroutineScope {
-            repo.backdropUrl(item)?.let { url -> launch { runCatching { loader.execute(heroRequest(context, url, heroPx)) } } }
-            repo.logoUrl(item)?.let { url -> launch { runCatching { prepareLogo(context, url) } } }
+            repo.backdropUrl(item)?.let { url -> launch { logged("HomeScreen.prefetchHero") { loader.execute(heroRequest(context, url, heroPx)) } } }
+            repo.logoUrl(item)?.let { url -> launch { logged("HomeScreen.prefetchHero") { prepareLogo(context, url) } } }
         }
     }
     LaunchedEffect(hero?.id) {
@@ -1019,7 +1020,7 @@ fun HomeScreen(app: AppState, model: HomeModel) {
             while (android.os.SystemClock.uptimeMillis() - model.lastMove < 1_500 || model.preview?.hot == true) delay(250)
             // Only the download matters here (it lands in the disk cache); decoding at a thumbnail size is almost free, where a
             // full-screen decode of each title at start-up was a burst of work and memory.
-            runCatching {
+            logged("HomeScreen.prefetchHero") {
                 loader.execute(coil3.request.ImageRequest.Builder(context).data(url).size(160, 90).memoryCachePolicy(coil3.request.CachePolicy.DISABLED).build())
             }
             delay(300)
@@ -1116,7 +1117,7 @@ fun HomeScreen(app: AppState, model: HomeModel) {
             val url = repo.thumbUrl(first, 640) ?: repo.posterUrl(first, 640) ?: continue
             if (!model.warmed.add(url)) continue
             while (android.os.SystemClock.uptimeMillis() - model.lastMove < 1_000 || model.preview?.hot == true) delay(250)
-            runCatching { loader.execute(coil3.request.ImageRequest.Builder(context).data(url).size(wide).build()) }
+            logged("HomeScreen.prefetchHero") { loader.execute(coil3.request.ImageRequest.Builder(context).data(url).size(wide).build()) }
             delay(40)
         }
         // The numbered list's larger pictures go first: they are the ones that used to pop in as the row scrolled into view.
@@ -1125,7 +1126,7 @@ fun HomeScreen(app: AppState, model: HomeModel) {
             if (url == null || !model.warmed.add(url)) continue
             while (android.os.SystemClock.uptimeMillis() - model.lastMove < 1_000 || model.preview?.hot == true) delay(250)
             val size = if (row.playOnClick) coil3.size.Size(cw, cw * 9 / 16) else if (row.numbered) coil3.size.Size(with(density) { NumPosterWidth.roundToPx() }, with(density) { NumPosterHeight.roundToPx() }) else coil3.size.Size(pw, ph)
-            runCatching { loader.execute(coil3.request.ImageRequest.Builder(context).data(url).size(size).build()) }
+            logged("HomeScreen.prefetchHero") { loader.execute(coil3.request.ImageRequest.Builder(context).data(url).size(size).build()) }
             Perf.homeNote = "warming pictures: ${model.warmed.size}"
             delay(40)
         }
@@ -1340,7 +1341,7 @@ private fun SurpriseMe(app: AppState, model: HomeModel, onUp: () -> Unit, modifi
                     scope.launch {
                         // The dice tumbles while the pick is fetched; the page opens once both are done.
                         val tumble = launch { roll.snapTo(0f); roll.animateTo(1f, androidx.compose.animation.core.tween(800, easing = FastOutSlowInEasing)) }
-                        val pick = runCatching { app.repo.surprise(options) }.getOrNull()
+                        val pick = logged("HomeScreen.SurpriseMe") { app.repo.surprise(options) }.getOrNull()
                         tumble.join()
                         busy = false
                         if (pick != null) {
@@ -1423,7 +1424,7 @@ private fun SurpriseOptionsPanel(app: AppState, o: SurpriseOptions, onChange: (S
     var pickingGenre by remember { mutableStateOf(false) }
     var backFromGenre by remember { mutableStateOf(false) }
     var genres by remember { mutableStateOf<List<String>>(emptyList()) }
-    LaunchedEffect(Unit) { genres = runCatching { app.repo.genres() }.getOrDefault(emptyList()) }
+    LaunchedEffect(Unit) { genres = logged("HomeScreen.SurpriseOptionsPanel") { app.repo.genres() }.getOrDefault(emptyList()) }
     fun <T> next(list: List<T>, now: T): T = list[(list.indexOf(now) + 1).mod(list.size)]
     if (pickingGenre) {
         PopupPanel({ pickingGenre = false; backFromGenre = true }, "Genre", swallowHeldOk = false, width = 260.dp) {

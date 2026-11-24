@@ -1,6 +1,7 @@
 package app.blush.tv.ui.details
 
 import androidx.activity.compose.BackHandler
+import app.blush.tv.data.logged
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -111,8 +112,8 @@ fun PersonScreen(app: AppState, personId: UUID) {
 
     LaunchedEffect(personId) {
         // The person and their titles are asked for together, not one after the other.
-        val titlesAsk = async { runCatching { repo.personTitles(personId) }.getOrDefault(emptyList()) }
-        runCatching { repo.item(personId) }.onSuccess { person = it }.onFailure { error = true }
+        val titlesAsk = async { logged("PersonScreen.PersonScreen") { repo.personTitles(personId) }.getOrDefault(emptyList()) }
+        logged("PersonScreen.PersonScreen") { repo.item(personId) }.onSuccess { person = it }.onFailure { error = true }
         titles = titlesAsk.await()
         val want = memory.index
         if (want > 0 && want < titles.orEmpty().size) {

@@ -185,7 +185,7 @@ class Repo(private val jellyfin: Jellyfin, private val baseDevice: DeviceInfo, v
      */
     suspend fun validate(user: SavedUser): Boolean? = withContext(Dispatchers.IO) {
         activate(user)
-        val result = runCatching { kotlinx.coroutines.withTimeout(12_000) { api.userApi.getCurrentUser() } }
+        val result = logged("Repo.validate") { kotlinx.coroutines.withTimeout(12_000) { api.userApi.getCurrentUser() } }
         if (result.isSuccess) return@withContext true
         val error = result.exceptionOrNull()
         // The SDK reports an HTTP error status as InvalidStatusException; anything else is a connection problem.
@@ -449,7 +449,7 @@ class Repo(private val jellyfin: Jellyfin, private val baseDevice: DeviceInfo, v
 
     suspend fun warmSearch() {
         // The counting is real work, so keep it off the main thread.
-        runCatching { withContext(Dispatchers.Default) { credits() } }
+        logged("Repo.warmSearch") { withContext(Dispatchers.Default) { credits() } }
     }
 
     /** The index as it was last worked out for this profile, kept on the device for a day so it isn't rebuilt on every launch. */
@@ -459,7 +459,7 @@ class Repo(private val jellyfin: Jellyfin, private val baseDevice: DeviceInfo, v
         return java.io.File(cacheDir, "credits-$server-$user.tsv")
     }
 
-    private fun readCredits(allowOld: Boolean = false): CreditIndex? = runCatching {
+    private fun readCredits(allowOld: Boolean = false): CreditIndex? = logged("Repo.readCredits") {
         val file = creditFile()?.takeIf { it.exists() && (allowOld || System.currentTimeMillis() - it.lastModified() < 24 * 3_600_000L) } ?: return null
         val people = ArrayList<Credit>()
         val studios = ArrayList<Credit>()
@@ -474,7 +474,7 @@ class Repo(private val jellyfin: Jellyfin, private val baseDevice: DeviceInfo, v
     }.getOrNull()
 
     private fun writeCredits(index: CreditIndex) {
-        runCatching {
+        logged("Repo.writeCredits") {
             val file = creditFile() ?: return
             fun clean(s: String) = s.replace('\t', ' ').replace('\n', ' ')
             val tmp = java.io.File(file.path + ".tmp")
@@ -494,7 +494,7 @@ class Repo(private val jellyfin: Jellyfin, private val baseDevice: DeviceInfo, v
             creditIndex = old
             val who = userId
             background.launch {
-                runCatching { scanCredits() }.onSuccess { if (userId == who) { creditIndex = it; writeCredits(it) } }
+                logged("Repo.credits") { scanCredits() }.onSuccess { if (userId == who) { creditIndex = it; writeCredits(it) } }
             }
             return@withLock old
         }
@@ -578,7 +578,7 @@ class Repo(private val jellyfin: Jellyfin, private val baseDevice: DeviceInfo, v
      */
     suspend fun serverStats(force: Boolean = false, progress: (String) -> Unit = {}): ServerStats = withContext(Dispatchers.IO) {
         if (!force) statsCache?.let { return@withContext it }
-        suspend fun count(kind: BaseItemKind) = runCatching {
+        suspend fun count(kind: BaseItemKind) = logged("Repo.serverStats") {
             api.itemsApi.getItems(userId = userId, recursive = true, includeItemTypes = listOf(kind), limit = 0, enableTotalRecordCount = true).content.totalRecordCount
         }.getOrDefault(0)
         progress("Counting titles…")
@@ -591,7 +591,7 @@ class Repo(private val jellyfin: Jellyfin, private val baseDevice: DeviceInfo, v
         var watched = 0
         var from = 0
         while (true) {
-            val page = runCatching {
+            val page = logged("Repo.serverStats") {
                 api.itemsApi.getItems(
                     userId = userId, recursive = true, includeItemTypes = listOf(BaseItemKind.MOVIE, BaseItemKind.EPISODE), isPlayed = true,
                     enableImages = false, enableUserData = true, startIndex = from, limit = 1000,
@@ -612,7 +612,7 @@ class Repo(private val jellyfin: Jellyfin, private val baseDevice: DeviceInfo, v
         from = 0
         while (true) {
             progress("Looking through your films… $from of $movies")
-            val page = runCatching {
+            val page = logged("Repo.serverStats") {
                 api.itemsApi.getItems(
                     userId = userId, recursive = true, includeItemTypes = listOf(BaseItemKind.MOVIE), fields = listOf(ItemFields.MEDIA_SOURCES),
                     enableImages = false, enableUserData = false, startIndex = from, limit = 200,
@@ -631,8 +631,8 @@ class Repo(private val jellyfin: Jellyfin, private val baseDevice: DeviceInfo, v
         val index = credits()
         progress("Counting genres…")
         val genreCounts = coroutineScope {
-            val names = runCatching { genres() }.getOrDefault(emptyList())
-            names.map { g -> async { g to runCatching { browsePage(genre = g, start = 0, limit = 1).second }.getOrDefault(0) } }.awaitAll()
+            val names = logged("Repo.serverStats") { genres() }.getOrDefault(emptyList())
+            names.map { g -> async { g to logged("Repo.serverStats") { browsePage(genre = g, start = 0, limit = 1).second }.getOrDefault(0) } }.awaitAll()
         }.filter { it.second > 0 }.sortedByDescending { it.second }.take(8)
 
         ServerStats(
@@ -675,7 +675,7 @@ class Repo(private val jellyfin: Jellyfin, private val baseDevice: DeviceInfo, v
                 .toList()
         } else {
             // Index unavailable: fall back to the server's own (alphabetical) person search.
-            runCatching { api.personsApi.getPersons(searchTerm = term, limit = limit, userId = userId).content.items }
+            logged("Repo.searchPeople") { api.personsApi.getPersons(searchTerm = term, limit = limit, userId = userId).content.items }
                 .getOrDefault(emptyList())
                 .map { Credit(it.id, it.name.orEmpty(), 0, it.imageTags?.get(ImageType.PRIMARY)) }
         }
@@ -686,7 +686,7 @@ class Repo(private val jellyfin: Jellyfin, private val baseDevice: DeviceInfo, v
 
     /** Matching films, series and collections: names starting with the text first, then better-rated. */
     suspend fun searchTitles(term: String): List<BaseItemDto> = withContext(Dispatchers.IO) {
-        runCatching { search(term) }.getOrDefault(emptyList())
+        logged("Repo.searchTitles") { search(term) }.getOrDefault(emptyList())
             .map { it to matchTier(it.name.orEmpty(), term) }
             .sortedWith(compareByDescending<Pair<BaseItemDto, Int>> { it.second }.thenByDescending { it.first.communityRating ?: 0f })
             .map { it.first }
@@ -701,15 +701,15 @@ class Repo(private val jellyfin: Jellyfin, private val baseDevice: DeviceInfo, v
         kotlinx.coroutines.coroutineScope {
             val studio = creditIndex?.studios?.firstOrNull { matchTier(it.name, term) >= 1 }
             val genresJob = async {
-                runCatching { api.genresApi.getGenres(searchTerm = term, limit = 1, userId = userId, enableTotalRecordCount = false).content.items }.getOrDefault(emptyList())
+                logged("Repo.searchExtras") { api.genresApi.getGenres(searchTerm = term, limit = 1, userId = userId, enableTotalRecordCount = false).content.items }.getOrDefault(emptyList())
             }
             val seen = exclude.toMutableSet()
             val extra = buildList {
                 studio?.let { st ->
-                    add(async { "From ${st.name}" to runCatching { browse(studio = st.name, sortBy = ItemSortBy.COMMUNITY_RATING, descending = true, limit = 30) }.getOrDefault(emptyList()) })
+                    add(async { "From ${st.name}" to logged("Repo.searchExtras") { browse(studio = st.name, sortBy = ItemSortBy.COMMUNITY_RATING, descending = true, limit = 30) }.getOrDefault(emptyList()) })
                 }
                 genresJob.await().forEach { genre ->
-                    add(async { genre.name.orEmpty() to runCatching { browse(genre = genre.name, sortBy = ItemSortBy.COMMUNITY_RATING, descending = true, limit = 30) }.getOrDefault(emptyList()) })
+                    add(async { genre.name.orEmpty() to logged("Repo.searchExtras") { browse(genre = genre.name, sortBy = ItemSortBy.COMMUNITY_RATING, descending = true, limit = 30) }.getOrDefault(emptyList()) })
                 }
             }.map { it.await() }
             extra.mapNotNull { (heading, items) ->
@@ -721,7 +721,7 @@ class Repo(private val jellyfin: Jellyfin, private val baseDevice: DeviceInfo, v
 
     /** How many films/series a library holds. */
     suspend fun libraryCount(library: BaseItemDto): Int? = withContext(Dispatchers.IO) {
-        runCatching {
+        logged("Repo.libraryCount") {
             api.itemsApi.getItems(
                 userId = userId,
                 parentId = library.id,
@@ -744,7 +744,7 @@ class Repo(private val jellyfin: Jellyfin, private val baseDevice: DeviceInfo, v
     /** Films and series for one person, best-rated first (tapping a person on the search screen). */
     suspend fun creditsFor(person: Credit): List<BaseItemDto> {
         val id = person.id ?: return emptyList()
-        return runCatching { browse(personId = id, sortBy = ItemSortBy.COMMUNITY_RATING, descending = true, limit = 60) }.getOrDefault(emptyList())
+        return logged("Repo.creditsFor") { browse(personId = id, sortBy = ItemSortBy.COMMUNITY_RATING, descending = true, limit = 60) }.getOrDefault(emptyList())
     }
 
     /** Something playable for a preview: a film itself, or a random episode of a series. */
@@ -818,11 +818,11 @@ class Repo(private val jellyfin: Jellyfin, private val baseDevice: DeviceInfo, v
                 ).content.items
             }
             val nextJob = async {
-                runCatching {
+                logged("Repo.resume") {
                     api.tvShowsApi.getNextUp(userId = userId, limit = 60, fields = cardFields, enableUserData = true, enableResumable = false, enableRewatching = false).content.items
                 }.getOrDefault(emptyList())
             }
-            val historyJob = async { runCatching { history(0, 80).first }.getOrDefault(emptyList()) }
+            val historyJob = async { logged("Repo.resume") { history(0, 80).first }.getOrDefault(emptyList()) }
             val partial = partialJob.await().sortedByDescending { it.userData?.lastPlayedDate }
             val hidden = store.hiddenNextUp
             val next = nextJob.await().filter { it.seriesId != null && it.id.toString() !in hidden }.associateBy { it.seriesId!! }
@@ -862,8 +862,8 @@ class Repo(private val jellyfin: Jellyfin, private val baseDevice: DeviceInfo, v
      */
     suspend fun extras(id: UUID): List<BaseItemDto> = withContext(Dispatchers.IO) {
         kotlinx.coroutines.coroutineScope {
-            val trailers = async { runCatching { api.userLibraryApi.getLocalTrailers(itemId = id, userId = userId).content }.getOrDefault(emptyList()) }
-            val special = async { runCatching { api.userLibraryApi.getSpecialFeatures(itemId = id, userId = userId).content }.getOrDefault(emptyList()) }
+            val trailers = async { logged("Repo.extras") { api.userLibraryApi.getLocalTrailers(itemId = id, userId = userId).content }.getOrDefault(emptyList()) }
+            val special = async { logged("Repo.extras") { api.userLibraryApi.getSpecialFeatures(itemId = id, userId = userId).content }.getOrDefault(emptyList()) }
             (trailers.await() + special.await()).distinctBy { it.id }
         }
     }
@@ -873,7 +873,7 @@ class Repo(private val jellyfin: Jellyfin, private val baseDevice: DeviceInfo, v
 
     /** Everything in the library a person is credited on, newest first. */
     suspend fun personTitles(personId: UUID): List<BaseItemDto> =
-        runCatching { browse(personId = personId, sortBy = ItemSortBy.PREMIERE_DATE, descending = true, limit = 120) }.getOrDefault(emptyList())
+        logged("Repo.extras") { browse(personId = personId, sortBy = ItemSortBy.PREMIERE_DATE, descending = true, limit = 120) }.getOrDefault(emptyList())
 
     suspend fun seasons(seriesId: UUID): List<BaseItemDto> = withContext(Dispatchers.IO) {
         api.tvShowsApi.getSeasons(seriesId = seriesId, userId = userId, enableUserData = true).content.items
@@ -937,7 +937,7 @@ class Repo(private val jellyfin: Jellyfin, private val baseDevice: DeviceInfo, v
         tagTables[type]?.takeIf { System.currentTimeMillis() - it.at < 6 * 3_600_000L }?.let { return@withLock it }
         val counts = HashMap<String, Int>()
         var total = 0
-        runCatching {
+        logged("Repo.tagTable") {
             var start = 0
             while (true) {
                 val page = api.itemsApi.getItems(
@@ -955,7 +955,7 @@ class Repo(private val jellyfin: Jellyfin, private val baseDevice: DeviceInfo, v
 
     /** Gets the tag tables ready in the background (called once Home has loaded), so the first title's page doesn't wait for them. */
     fun warmTags() {
-        background.launch { runCatching { tagTable(BaseItemKind.MOVIE); tagTable(BaseItemKind.SERIES) } }
+        background.launch { logged("Repo.warmTags") { tagTable(BaseItemKind.MOVIE); tagTable(BaseItemKind.SERIES) } }
     }
 
     private suspend fun computeMoreLikeThis(item: BaseItemDto, count: Int): List<BaseItemDto> = withContext(Dispatchers.IO) {
@@ -984,7 +984,7 @@ class Repo(private val jellyfin: Jellyfin, private val baseDevice: DeviceInfo, v
         val telling = tags.filter { (tagCounts[it] ?: 0) in 2..maxOf(2, libraryCount / 5) }.sortedByDescending { tagWeight(it) }.take(10)
 
         val candidates = kotlinx.coroutines.coroutineScope {
-            fun query(block: suspend () -> List<BaseItemDto>) = async { runCatching { block() }.getOrDefault(emptyList()) }
+            fun query(block: suspend () -> List<BaseItemDto>) = async { logged("Repo.query") { block() }.getOrDefault(emptyList()) }
             val byTags = if (telling.isEmpty()) null else query {
                 api.itemsApi.getItems(
                     userId = userId, recursive = true, includeItemTypes = types,
@@ -1072,7 +1072,7 @@ class Repo(private val jellyfin: Jellyfin, private val baseDevice: DeviceInfo, v
     }
 
     suspend fun warmNames() {
-        runCatching { withContext(Dispatchers.Default) { names() } }
+        logged("Repo.warmNames") { withContext(Dispatchers.Default) { names() } }
     }
 
     private fun editDistance(a: String, b: String): Int {
@@ -1162,7 +1162,7 @@ class Repo(private val jellyfin: Jellyfin, private val baseDevice: DeviceInfo, v
 
     /** Takes a title out of Continue watching by clearing where you'd got to (it stays unwatched, just not "in progress"). */
     suspend fun clearProgress(id: UUID): Boolean = withContext(Dispatchers.IO) {
-        runCatching {
+        logged("Repo.clearProgress") {
             api.itemsApi.updateItemUserData(
                 itemId = id,
                 userId = userId,
@@ -1195,10 +1195,10 @@ class Repo(private val jellyfin: Jellyfin, private val baseDevice: DeviceInfo, v
     suspend fun clearHistory(): Boolean = withContext(Dispatchers.IO) {
         var ok = true
         repeat(50) {
-            val page = runCatching { history(0, 200).first }.getOrNull() ?: return@withContext false
+            val page = logged("Repo.clearHistory") { history(0, 200).first }.getOrNull() ?: return@withContext false
             if (page.isEmpty()) return@withContext ok
             page.forEach { item ->
-                if (runCatching { api.playStateApi.markUnplayedItem(itemId = item.id, userId = userId) }.isFailure) ok = false
+                if (logged("Repo.clearHistory") { api.playStateApi.markUnplayedItem(itemId = item.id, userId = userId) }.isFailure) ok = false
             }
         }
         ok
@@ -1211,7 +1211,7 @@ class Repo(private val jellyfin: Jellyfin, private val baseDevice: DeviceInfo, v
     }
 
     suspend fun segments(id: UUID): List<MediaSegmentDto> = withContext(Dispatchers.IO) {
-        runCatching {
+        logged("Repo.segments") {
             api.mediaSegmentsApi.getItemSegments(itemId = id, includeSegmentTypes = listOf(MediaSegmentType.INTRO, MediaSegmentType.OUTRO, MediaSegmentType.RECAP, MediaSegmentType.PREVIEW))
                 .content.items
         }.getOrDefault(emptyList())

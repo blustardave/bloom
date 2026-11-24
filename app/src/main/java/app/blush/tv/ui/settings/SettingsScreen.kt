@@ -1,6 +1,7 @@
 package app.blush.tv.ui.settings
 
 import androidx.compose.foundation.background
+import app.blush.tv.data.logged
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -65,6 +66,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.blush.tv.BuildConfig
+import app.blush.tv.data.ErrorLog
+import androidx.compose.foundation.layout.heightIn
 import app.blush.tv.data.HomeCache
 import app.blush.tv.data.RailPin
 import app.blush.tv.playback.Languages
@@ -517,7 +520,7 @@ private fun AppearancePane(app: AppState) {
         mutableStateOf(store.homeRowOrder.filter { it in defaultOrder }.let { o -> if (o.isEmpty()) defaultOrder else o + defaultOrder.filter { it !in o } })
     }
     var genres by remember { mutableStateOf<List<String>>(emptyList()) }
-    LaunchedEffect(Unit) { genres = runCatching { app.repo.genres() }.getOrDefault(emptyList()) }
+    LaunchedEffect(Unit) { genres = logged("SettingsScreen.AppearancePane") { app.repo.genres() }.getOrDefault(emptyList()) }
     fun toggle(key: String) { open = if (open == key) null else key }
     fun changed() { app.homeChanged = true }
     fun move(rowKey: String, step: Int) {
@@ -667,7 +670,7 @@ private fun NavBarPane(app: AppState) {
     var attempt by remember { mutableStateOf(0) }
     LaunchedEffect(attempt) {
         if (attempt > 0) libraries = null
-        val fresh = runCatching { app.repo.libraries() }.getOrDefault(emptyList())
+        val fresh = logged("SettingsScreen.NavBarPane") { app.repo.libraries() }.getOrDefault(emptyList())
         if (fresh.isNotEmpty() || libraries == null) libraries = fresh
         if (fresh.isNotEmpty()) cachedLibraries = fresh
     }
@@ -870,9 +873,11 @@ private fun AboutPane(app: AppState) {
     val store = app.repo.store
     val server = store.server
     var showStats by remember { mutableStateOf(false) }
+    var showErrors by remember { mutableStateOf(false) }
     var onScreen by remember { mutableStateOf(store.showStats) }
     var note by remember { mutableStateOf<String?>(null) }
     if (showStats) StatisticsPopup { showStats = false }
+    if (showErrors) RecentErrorsPopup { showErrors = false }
     Pane(Tab.About) {
         card("about", "Bloom") {
             StatRow("Version", "Bloom ${BuildConfig.VERSION_NAME}")
@@ -881,6 +886,7 @@ private fun AboutPane(app: AppState) {
         }
         card("diag", "Diagnostics") {
             ActionRow("Statistics", "Frame speed, memory and what the app was busy with, to track down lag") { showStats = true }
+            ActionRow("Recent errors", "Things that went wrong without crashing, like a row that didn't load. Take a photo to send") { showErrors = true }
             ToggleRow(
                 "Show statistics on screen", onScreen,
                 detail = "Keeps them in the corner while you browse, to catch lag as it happens",
@@ -955,5 +961,52 @@ private fun StatisticsPopup(onDismiss: () -> Unit) {
         val close = remember { FocusRequester() }
         LaunchedEffect(Unit) { repeat(15) { delay(40); if (runCatching { close.requestFocus() }.getOrDefault(false)) return@LaunchedEffect } }
         app.blush.tv.ui.components.PopupRow("Close", modifier = Modifier.focusRequester(close), onClick = onDismiss)
+    }
+}
+
+/** Settings → About → Recent errors: what [ErrorLog] has kept, newest first, so it can be photographed and sent. */
+@Composable
+private fun RecentErrorsPopup(onDismiss: () -> Unit) {
+    var entries by remember { mutableStateOf(ErrorLog.entries()) }
+    val time = remember { java.text.SimpleDateFormat("d MMM HH:mm:ss", java.util.Locale.UK) }
+    val body = if (entries.isEmpty()) "Nothing has gone wrong since this list was last cleared."
+        else "${entries.size} kept, newest first. ${BuildConfig.VERSION_NAME}"
+    app.blush.tv.ui.components.PopupPanel(onDismiss, "Recent errors", body, swallowHeldOk = false, width = 560.dp) {
+        val close = app.blush.tv.ui.components.rememberFirstFocus()
+        app.blush.tv.ui.components.PopupRow("Close", modifier = Modifier.focusRequester(close), onClick = onDismiss)
+        if (entries.isNotEmpty()) {
+            app.blush.tv.ui.components.PopupRow("Clear the list", "Start afresh before testing something") {
+                ErrorLog.clear()
+                entries = emptyList()
+            }
+            androidx.compose.foundation.lazy.LazyColumn(
+                Modifier.fillMaxWidth().heightIn(max = 400.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                items(entries.size) { i ->
+                    val e = entries[i]
+                    val count = if (e.count > 1) " · ${e.count} times, last ${time.format(java.util.Date(e.lastAt))}" else ""
+                    FocusSurface(
+                        onClick = {},
+                        shape = RoundedCornerShape(12.dp),
+                        focusedScale = 1f,
+                        ringWidth = 0.dp,
+                        background = Color.Transparent,
+                        focusedBackground = Color.White.copy(alpha = 0.12f),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Column(Modifier.padding(horizontal = 10.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text("${e.where} · ${time.format(java.util.Date(e.firstAt))}$count", style = BlushType.caption.copy(fontWeight = FontWeight.W600), color = Blush.colors.textSoft)
+                            Text(e.what, style = BlushType.caption, color = Blush.colors.text)
+                            if (e.trace.isNotBlank()) Text(
+                                e.trace,
+                                style = BlushType.caption.copy(fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace, fontSize = 9.sp, lineHeight = 11.5.sp),
+                                color = Blush.colors.textDim,
+                            )
+                        }
+                    }
+                }
+            }
+        }
     }
 }

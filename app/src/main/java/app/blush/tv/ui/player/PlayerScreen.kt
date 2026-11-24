@@ -1,6 +1,7 @@
 package app.blush.tv.ui.player
 
 import androidx.compose.ui.draw.drawWithContent
+import app.blush.tv.data.logged
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.animation.core.FastOutSlowInEasing
 import app.blush.tv.ui.components.PosterCard
@@ -223,13 +224,13 @@ fun PlayerScreen(app: AppState, route: Route.Player) {
     LaunchedEffect(volume, audioSink.gainActive) { applyVolume(volume) }
     val booster = remember(audioSession, volume > 1f, audioSink.gainActive) {
         if (volume <= 1f || audioSession == C.AUDIO_SESSION_ID_UNSET || audioSink.gainActive) null
-        else runCatching { android.media.audiofx.LoudnessEnhancer(audioSession) }.getOrNull()
+        else logged("PlayerScreen.volumeBoost") { android.media.audiofx.LoudnessEnhancer(audioSession) }.getOrNull()
     }
     DisposableEffect(booster) { onDispose { runCatching { booster?.release() } } }
     LaunchedEffect(booster, volume) {
         booster ?: return@LaunchedEffect
         // The same scale as gainFor: +9 dB at 150% (the target is in hundredths of a decibel).
-        runCatching {
+        logged("PlayerScreen.volumeBoost") {
             booster.setTargetGain((1800 * (volume - 1f)).toInt())
             booster.enabled = true
         }
@@ -311,7 +312,7 @@ fun PlayerScreen(app: AppState, route: Route.Player) {
                 subtitlePick = sid?.let { TrackPick.decode(repo.store.seriesSubtitlePick(it)) },
             )
         } else null
-        val prepared = runCatching {
+        val prepared = logged("PlayerScreen.load") {
             // The server not answering must end in a message, not a spinner that never stops.
             kotlinx.coroutines.withTimeoutOrNull(25_000) { repo.preparePlayback(target, startMs * TICKS_PER_MS, audio, subtitle, forceTranscode, maxBitrate = qualityCap, languages = langs) }
                 ?: throw IllegalStateException("the server didn't answer in time")
@@ -353,7 +354,7 @@ fun PlayerScreen(app: AppState, route: Route.Player) {
         val credits = segments.firstOrNull { it.type == MediaSegmentType.OUTRO }?.let { pos >= it.startTicks } == true
         PlayerReports.lastStop = reportScope.launch {
             repo.reportStopped(s, pos)
-            if (credits) runCatching { repo.setPlayed(s.item.id, true) }
+            if (credits) logged("PlayerScreen.stopAndReport") { repo.setPlayed(s.item.id, true) }
         }
     }
 
@@ -390,16 +391,16 @@ fun PlayerScreen(app: AppState, route: Route.Player) {
         tilesShown = false
         tilesDismissed = false
         // Tiles from the home screen don't carry everything; fetch the full item.
-        val full = runCatching { repo.item(route.item.id) }.getOrDefault(route.item)
+        val full = logged("PlayerScreen.playNext") { repo.item(route.item.id) }.getOrDefault(route.item)
         // The resume point comes from the freshly fetched item, not the (possibly old) copy the last screen held.
         val start = if (route.fromStart) 0L else (full.userData?.playbackPositionTicks ?: 0L) / TICKS_PER_MS
         item = full
         load(full, start, null, null)
         segments = repo.segments(full)
-        nextEpisode = if (full.type == BaseItemKind.EPISODE) runCatching { repo.episodeAfter(full) }.getOrNull() else null
+        nextEpisode = if (full.type == BaseItemKind.EPISODE) logged("PlayerScreen.playNext") { repo.episodeAfter(full) }.getOrNull() else null
         // A film or a show's last episode with credits: fetch what to offer during them now, so it's ready in time.
         if (nextEpisode == null && segments.any { it.type == MediaSegmentType.OUTRO }) {
-            creditsTiles = runCatching {
+            creditsTiles = logged("PlayerScreen.playNext") {
                 val base = if (full.type == BaseItemKind.EPISODE) full.seriesId?.let { repo.item(it) } else full
                 base?.let { repo.moreLikeThis(it) }.orEmpty().take(5)
             }.getOrDefault(emptyList())
@@ -879,7 +880,7 @@ fun PlayerScreen(app: AppState, route: Route.Player) {
             val idx = textSubtitle?.index ?: return@LaunchedEffect
             if (subShiftMs == 0L || shiftedCues?.first == idx) return@LaunchedEffect
             subShiftNote = "Loading the subtitles to shift them…"
-            val cues = runCatching { SubtitleText.fetch(repo.api.baseUrl.orEmpty(), repo.api.accessToken.orEmpty(), s, idx) }.getOrNull()
+            val cues = logged("PlayerScreen.toggleSubtitles") { SubtitleText.fetch(repo.api.baseUrl.orEmpty(), repo.api.accessToken.orEmpty(), s, idx) }.getOrNull()
             if (cues.isNullOrEmpty()) subShiftNote = "Couldn't load these subtitles to shift them"
             else { shiftedCues = idx to cues; subShiftNote = null }
         }

@@ -125,6 +125,23 @@ Shared with the Mac app: `shared/src/commonMain/kotlin/app/blush/tv/` (same pack
 
 ## Change history (newest first)
 
+### Build 256 → app 0.3.173 (errors are recorded instead of thrown away; Mac app paused)
+- **Plan agreed with the owner (24 Nov 2026):** Fire TV first. Step 1 = stop hiding errors (this build). Step 2 = replace the
+  focus workarounds (the 300 ms watchdog in `SideRail.WithRail`, the "wait a frame and retry requestFocus" loops) one per build,
+  using the new log to see how often each fired. Later: rebuild the Home wide tile as an overlay (AUDIT P3) and keep one
+  long-lived preview player, which is how Netflix/Disney+ manage expanding tiles on the same hardware.
+- New `shared/.../data/ErrorLog.kt`: keeps the newest 200 failures (repeats folded with a count), saved to
+  `files/recent_errors.txt`. `logged("Where") { … }` behaves exactly like `runCatching` (same `Result`, still catches
+  cancellation, so no behaviour change) but records the failure. Plain cancellations are not recorded; timeouts are.
+- 109 `runCatching` blocks around server calls, loading, playback reporting and saved settings now use `logged` (Repo, Store,
+  HomeCache, Playback, Home, Hero, Preview, Details, Person, Library, Libraries, Search, Settings, Auth, Player, SideRail).
+  Left as `runCatching` on purpose: `requestFocus` calls (expected to fail while retrying; they're step 2), CrashLog, Perf,
+  Locale lookups, sound effects, releasing players/effects.
+- Settings → About → Diagnostics → **Recent errors**: the list (where, when, how many times, the message, Bloom file:line),
+  with "Clear the list". `proguard-rules.pro` now keeps file names and line numbers so the lines are real.
+- CI: the Mac app is no longer built on push; run the workflow by hand with "Build the Mac app" ticked to build it. `desktop/`
+  is untouched.
+
 ### Build 254 → Mac 0.3.171 (Mac: nav bar redesign, Back button, title page background, Search page; TV unchanged)
 - Owner's notes on 0.3.170, with a reference screenshot of another Jellyfin client's bar (flat dark pill, solid white
   pill on the current page, logo left, search + avatar right). Owner asked me to choose the pill's behaviour for a Mac.

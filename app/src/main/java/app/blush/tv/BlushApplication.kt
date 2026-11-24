@@ -2,6 +2,7 @@ package app.blush.tv
 
 import android.app.Application
 import app.blush.tv.data.AndroidPrefs
+import app.blush.tv.data.ErrorLog
 import app.blush.tv.data.Repo
 import app.blush.tv.data.Store
 import coil3.ImageLoader
@@ -31,6 +32,8 @@ class BlushApplication : Application(), SingletonImageLoader.Factory {
         super.onCreate()
         context = this
         CrashLog.install(this)
+        // Failures that don't crash the app (see Settings → About → Recent errors).
+        ErrorLog.init(filesDir)
         // The server code is shared with the Mac app; only the SDK set-up, device name and settings file are Android's own.
         val device = androidDevice(this)
         val jellyfin = createJellyfin {

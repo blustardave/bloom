@@ -1,6 +1,7 @@
 package app.blush.tv.ui.browse
 
 import androidx.compose.foundation.background
+import app.blush.tv.data.logged
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -62,7 +63,7 @@ fun LibrariesScreen(app: AppState) {
 
     var failed by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
-        val result = runCatching { repo.libraries() }
+        val result = logged("LibrariesScreen.LibrariesScreen") { repo.libraries() }
         result.exceptionOrNull()?.let { if (it is kotlinx.coroutines.CancellationException) throw it }
         failed = result.isFailure
         libraries = result.getOrDefault(emptyList())
