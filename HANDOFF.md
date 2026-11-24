@@ -125,7 +125,7 @@ Shared with the Mac app: `shared/src/commonMain/kotlin/app/blush/tv/` (same pack
 
 ## Change history (newest first)
 
-### Build 256 → app 0.3.173 (errors are recorded instead of thrown away; Mac app paused)
+### Build 257 → app 0.3.174 (errors are recorded instead of thrown away; Mac app paused)
 - **Plan agreed with the owner (24 Nov 2026):** Fire TV first. Step 1 = stop hiding errors (this build). Step 2 = replace the
   focus workarounds (the 300 ms watchdog in `SideRail.WithRail`, the "wait a frame and retry requestFocus" loops) one per build,
   using the new log to see how often each fired. Later: rebuild the Home wide tile as an overlay (AUDIT P3) and keep one
@@ -139,6 +139,8 @@ Shared with the Mac app: `shared/src/commonMain/kotlin/app/blush/tv/` (same pack
   Locale lookups, sound effects, releasing players/effects.
 - Settings → About → Diagnostics → **Recent errors**: the list (where, when, how many times, the message, Bloom file:line),
   with "Clear the list". `proguard-rules.pro` now keeps file names and line numbers so the lines are real.
+- Build 256 failed: an `inline` function from `shared` can't be used by `app` when shared's Android half is compiled for Java 21
+  and the app for 11. `shared/build.gradle.kts` now sets the Android compile to JVM 11.
 - CI: the Mac app is no longer built on push; run the workflow by hand with "Build the Mac app" ticked to build it. `desktop/`
   is untouched.
 
