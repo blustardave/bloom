@@ -125,7 +125,7 @@ Shared with the Mac app: `shared/src/commonMain/kotlin/app/blush/tv/` (same pack
 
 ## Change history (newest first)
 
-### Build 258 → app 0.3.175 (Home: the row no longer re-lays itself out on every press — AUDIT P3)
+### Build 259 → app 0.3.176 (Home: the row no longer re-lays itself out on every press — AUDIT P3)
 - `HoverPosterTile` used to change its real width (poster ↔ wide thumbnail), so each Left/Right re-measured the whole
   `LazyRow`, and `alignTo` had to re-anchor the list when moving left. Now each tile always reports a poster-sized slot
   (a `layout` modifier on the tile's root measures its content at the shown width but reports `slotPx`), and the tiles after
