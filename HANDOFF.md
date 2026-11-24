@@ -125,7 +125,7 @@ Shared with the Mac app: `shared/src/commonMain/kotlin/app/blush/tv/` (same pack
 
 ## Change history (newest first)
 
-### Build after 259 (pictures that fail to load are recorded)
+### Build 261 → app 0.3.178 (pictures that fail to load are recorded)
 - Owner reported (24 Nov, on 0.3.176): some posters, thumbnails, and details-page backgrounds/logos not loading. Nothing in
   the image pipeline changed in 257/259 (Coil set-up, `RemoteImage`, URL building untouched), so the cause isn't known yet.
 - `Perf.imageEvents.onError` now records each failed picture in `ErrorLog` as "Image (Primary|Backdrop|Logo|Thumb|other)"
