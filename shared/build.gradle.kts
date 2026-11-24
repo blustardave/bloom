@@ -35,3 +35,9 @@ kotlin {
         }
     }
 }
+
+// The TV app compiles for Java 11 bytecode (Android's default), and an `inline` function from here (e.g. `logged`) can only be
+// copied into it if this side uses the same level. Without this the Android half of shared defaults to the build's Java 21.
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile>()
+    .matching { it.name.contains("Android", ignoreCase = true) }
+    .configureEach { compilerOptions.jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_11) }
