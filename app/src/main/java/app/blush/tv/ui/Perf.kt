@@ -61,6 +61,7 @@ object Perf {
     val imageNanos = AtomicLong()
 
     /** Times pictures as they load (installed on the image loader). */
+    private val imageKind = Regex("/Images/(\\w+)")
     val imageEvents = object : EventListener() {
         private val started = ConcurrentHashMap<ImageRequest, Long>()
         override fun onStart(request: ImageRequest) { if (enabled) started[request] = System.nanoTime() }
@@ -70,7 +71,14 @@ object Perf {
             if (result.dataSource == coil3.decode.DataSource.MEMORY_CACHE) imagesFromMemory.incrementAndGet()
             else imageNanos.addAndGet(System.nanoTime() - t)
         }
-        override fun onError(request: ImageRequest, result: ErrorResult) { started.remove(request) }
+        override fun onError(request: ImageRequest, result: ErrorResult) {
+            started.remove(request)
+            // A picture that didn't load goes in Settings → Recent errors, under what kind of picture it was (Primary is the
+            // poster, Backdrop the background, Logo, Thumb), so a run of failures shows up as one line with a count.
+            val url = request.data.toString()
+            val kind = imageKind.find(url)?.groupValues?.get(1) ?: "other"
+            app.blush.tv.data.ErrorLog.record("Image ($kind)", result.throwable)
+        }
         override fun onCancel(request: ImageRequest) { started.remove(request) }
     }
 }
